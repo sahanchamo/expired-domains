@@ -1,0 +1,12 @@
+.env
+.browser-state/
+.venv/
+venv/
+result.json
+domains.jsonl
+seen_domains.json
+scraped_page.json
+signup_debug.json
+login_debug.html
+__pycache__/
+*.pyc
