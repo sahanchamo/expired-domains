@@ -26,11 +26,14 @@ BASE_URL = "https://www.expireddomains.net"
 LOGIN_URL = "https://www.expireddomains.net/login/"
 MEMBER_AREA_WARMUP_URL = LOGIN_URL
 DOMAIN_RE = re.compile(r"^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$", re.IGNORECASE)
-MIN_INTERVAL_SECONDS = 1800
-MIN_EXPORT_INTERVAL_SECONDS = 600
+MIN_INTERVAL_SECONDS = 60
+MIN_EXPORT_INTERVAL_SECONDS = 60
 MIN_REQUEST_GAP_SECONDS = 50.0
 MAX_PAGES_PER_RUN = 2
 DEFAULT_DOMAINS_PER_PAGE = 25
+DEFAULT_DAILY_PAGE_LIMIT = 51
+DEFAULT_CURSOR_CYCLE_SECONDS = 24 * 60 * 60
+MAIN_STATUS_FILE = Path(os.getenv("MAIN_STATUS_FILE", "main_status.json"))
 
 RAW_TLD_FILTERS = """
 .dk, .cl, .pt, .sk, .lt, .ro, *.jp, .*au, .no, .jp, *.jp, .hr, .nu, .au,
@@ -55,6 +58,8 @@ class Settings:
     request_gap_seconds: float
     pages_per_run: int
     start_page: int
+    daily_page_limit: int
+    cursor_cycle_seconds: int
     advance_pages: bool
     page_cursor_file: Path
     target_total_domains: int
@@ -69,6 +74,7 @@ class Settings:
     output_json: Path
     output_jsonl: Path
     export_domains_only: bool
+    export_csv_enabled: bool
     export_domains_file: Path
     seen_file: Path
     state_dir: Path
@@ -85,10 +91,30 @@ class Settings:
     manual_login_wait_seconds: int
     human_delay_min_seconds: float
     human_delay_max_seconds: float
+    verbose_logs: bool
+    wsc_auto_after_export: bool
+    wsc_auto_batch_size: int
+    wsc_auto_max_batches: int
 
 
 class AccountBlockedError(RuntimeError):
     pass
+
+
+def update_main_status(**values: Any) -> None:
+    current: dict[str, Any] = {}
+    if MAIN_STATUS_FILE.exists():
+        try:
+            loaded = json.loads(MAIN_STATUS_FILE.read_text(encoding="utf-8"))
+            current = loaded if isinstance(loaded, dict) else {}
+        except json.JSONDecodeError:
+            current = {}
+    current.update(values)
+    current["pid"] = os.getpid()
+    if current.get("status") != "sleeping" and "next_run_in_seconds" not in values:
+        current["next_run_in_seconds"] = None
+    current["updated_at"] = datetime.now(timezone.utc).isoformat()
+    MAIN_STATUS_FILE.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -108,6 +134,8 @@ def load_settings() -> Settings:
         request_gap_seconds=float(os.getenv("REQUEST_GAP_SECONDS", "3")),
         pages_per_run=int(os.getenv("SCRAPE_PAGES_PER_RUN", "5")),
         start_page=int(os.getenv("SCRAPE_START_PAGE", "1")),
+        daily_page_limit=int(os.getenv("SCRAPE_DAILY_PAGE_LIMIT", str(DEFAULT_DAILY_PAGE_LIMIT))),
+        cursor_cycle_seconds=int(os.getenv("SCRAPE_CURSOR_CYCLE_SECONDS", str(DEFAULT_CURSOR_CYCLE_SECONDS))),
         advance_pages=env_bool("SCRAPE_ADVANCE_PAGES", False),
         page_cursor_file=Path(os.getenv("SCRAPE_PAGE_CURSOR_FILE", "page_cursor.json")),
         target_total_domains=int(os.getenv("SCRAPE_TARGET_TOTAL_DOMAINS", "0")),
@@ -122,6 +150,7 @@ def load_settings() -> Settings:
         output_json=Path(os.getenv("OUTPUT_JSON", "result.json")),
         output_jsonl=Path(os.getenv("OUTPUT_JSONL", "domains.jsonl")),
         export_domains_only=env_bool("EXPORT_DOMAINS_ONLY", env_bool("EXPORT_CSV_ONLY", False)),
+        export_csv_enabled=env_bool("EXPORT_CSV_ENABLED", False),
         export_domains_file=Path(os.getenv("EXPORT_DOMAINS_FILE", os.getenv("EXPORT_CSV", "expired_domains_export.txt"))),
         seen_file=Path(os.getenv("SEEN_FILE", "seen_domains.json")),
         state_dir=Path(os.getenv("STATE_DIR", ".browser-state")),
@@ -138,8 +167,17 @@ def load_settings() -> Settings:
         manual_login_wait_seconds=int(os.getenv("EXPIREDDOMAINS_MANUAL_LOGIN_WAIT_SECONDS", "300")),
         human_delay_min_seconds=float(os.getenv("HUMAN_DELAY_MIN_SECONDS", "1.5")),
         human_delay_max_seconds=float(os.getenv("HUMAN_DELAY_MAX_SECONDS", "5.0")),
+        verbose_logs=env_bool("SCRAPE_VERBOSE_LOGS", False),
+        wsc_auto_after_export=env_bool("WSC_AUTO_AFTER_EXPORT", False),
+        wsc_auto_batch_size=int(os.getenv("WSC_AUTO_BATCH_SIZE", "50")),
+        wsc_auto_max_batches=int(os.getenv("WSC_AUTO_MAX_BATCHES", "4")),
     )
     return conservative_settings(settings)
+
+
+def verbose_print(settings: Settings, message: str) -> None:
+    if settings.verbose_logs:
+        print(message, flush=True)
 
 
 def conservative_settings(settings: Settings) -> Settings:
@@ -165,6 +203,10 @@ def conservative_settings(settings: Settings) -> Settings:
             file=sys.stderr,
         )
         settings.pages_per_run = MAX_PAGES_PER_RUN
+    if settings.daily_page_limit < settings.start_page:
+        settings.daily_page_limit = DEFAULT_DAILY_PAGE_LIMIT
+    if settings.cursor_cycle_seconds <= 0:
+        settings.cursor_cycle_seconds = DEFAULT_CURSOR_CYCLE_SECONDS
     if settings.domains_per_page <= 0:
         settings.domains_per_page = DEFAULT_DOMAINS_PER_PAGE
     if settings.tld_filter_mode not in {"include", "exclude"}:
@@ -177,6 +219,10 @@ def conservative_settings(settings: Settings) -> Settings:
         settings.human_delay_min_seconds = 0
     if settings.human_delay_max_seconds < settings.human_delay_min_seconds:
         settings.human_delay_max_seconds = settings.human_delay_min_seconds
+    if settings.wsc_auto_batch_size <= 0 or settings.wsc_auto_batch_size > 50:
+        settings.wsc_auto_batch_size = 50
+    if settings.wsc_auto_max_batches < 0:
+        settings.wsc_auto_max_batches = 0
     return settings
 
 
@@ -215,6 +261,10 @@ def domain_matches(domain: str, filters: tuple[str, ...]) -> bool:
 def domain_allowed_by_tlds(domain: str, filters: tuple[str, ...], mode: str) -> bool:
     matched = domain_matches(domain, filters)
     return not matched if mode == "exclude" else matched
+
+
+def complete_domain_value(domain: str) -> bool:
+    return bool(domain.strip()) and ".." not in domain
 
 
 def page_url(base_url: str, page_number: int, domains_per_page: int = DEFAULT_DOMAINS_PER_PAGE) -> str:
@@ -325,12 +375,68 @@ def load_seen(path: Path) -> set[str]:
     return set(data if isinstance(data, list) else [])
 
 
-def load_page_cursor(settings: Settings) -> int:
+def read_page_cursor_data(settings: Settings) -> dict[str, Any]:
     if not settings.advance_pages or not settings.page_cursor_file.exists():
-        return settings.start_page
+        return {}
     try:
         data = json.loads(settings.page_cursor_file.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def parse_cursor_datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def cursor_cycle_started_at(data: dict[str, Any]) -> datetime:
+    return (
+        parse_cursor_datetime(data.get("cycle_started_at"))
+        or parse_cursor_datetime(data.get("updated_at"))
+        or datetime.now(timezone.utc)
+    )
+
+
+def reset_page_cursor_cycle(settings: Settings, reason: str) -> None:
+    if not settings.advance_pages:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    data = {
+        "next_page": settings.start_page,
+        "next_batch": 1,
+        "next_url": "",
+        "cycle_started_at": now,
+        "updated_at": now,
+        "reset_reason": reason,
+    }
+    settings.page_cursor_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def seconds_until_cursor_cycle_reset(settings: Settings, data: dict[str, Any]) -> int:
+    if not settings.advance_pages or settings.daily_page_limit <= 0:
+        return 0
+    page_number = data.get("next_page")
+    if not isinstance(page_number, int) or page_number <= settings.daily_page_limit:
+        return 0
+    elapsed = (datetime.now(timezone.utc) - cursor_cycle_started_at(data)).total_seconds()
+    return max(0, int(settings.cursor_cycle_seconds - elapsed))
+
+
+def load_page_cursor(settings: Settings) -> int:
+    data = read_page_cursor_data(settings)
+    if not data:
+        return settings.start_page
+    wait_seconds = seconds_until_cursor_cycle_reset(settings, data)
+    if wait_seconds == 0 and isinstance(data.get("next_page"), int) and data["next_page"] > settings.daily_page_limit > 0:
+        reset_page_cursor_cycle(settings, "daily_page_limit_elapsed")
         return settings.start_page
     page_number = data.get("next_page") if isinstance(data, dict) else None
     if not isinstance(page_number, int) or page_number < settings.start_page:
@@ -339,22 +445,16 @@ def load_page_cursor(settings: Settings) -> int:
 
 
 def load_page_cursor_url(settings: Settings) -> str:
-    if not settings.advance_pages or not settings.page_cursor_file.exists():
-        return ""
-    try:
-        data = json.loads(settings.page_cursor_file.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    data = read_page_cursor_data(settings)
+    if not data or seconds_until_cursor_cycle_reset(settings, data) > 0:
         return ""
     next_url = data.get("next_url") if isinstance(data, dict) else None
     return str(next_url) if next_url else ""
 
 
 def load_page_cursor_batch(settings: Settings) -> int:
-    if not settings.advance_pages or not settings.page_cursor_file.exists():
-        return 1
-    try:
-        data = json.loads(settings.page_cursor_file.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    data = read_page_cursor_data(settings)
+    if not data or seconds_until_cursor_cycle_reset(settings, data) > 0:
         return 1
     batch = data.get("next_batch") if isinstance(data, dict) else None
     if isinstance(batch, int) and batch > 0:
@@ -368,10 +468,13 @@ def load_page_cursor_batch(settings: Settings) -> int:
 def save_page_cursor(settings: Settings, next_page: int, next_url: str = "", next_batch: int | None = None) -> None:
     if not settings.advance_pages:
         return
+    previous = read_page_cursor_data(settings)
+    cycle_started_at = previous.get("cycle_started_at") or datetime.now(timezone.utc).isoformat()
     data = {
         "next_page": max(settings.start_page, next_page),
         "next_batch": next_batch if next_batch is not None else max(1, next_page),
         "next_url": next_url,
+        "cycle_started_at": cycle_started_at,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     settings.page_cursor_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -454,10 +557,52 @@ def save_export_domains_mongo(settings: Settings, domains: list[str], source_url
 
     with MongoClient(settings.mongo_uri) as client:
         collection = client[settings.mongo_db][settings.mongo_collection]
+        duplicate_collection_name = os.getenv("MONGO_DUPLICATE_COLLECTION", f"{settings.mongo_collection}_duplicates").strip()
+        incomplete_collection_name = os.getenv("MONGO_INCOMPLETE_COLLECTION", f"{settings.mongo_collection}_incomplete").strip()
+        duplicates = client[settings.mongo_db][duplicate_collection_name]
+        incomplete = client[settings.mongo_db][incomplete_collection_name]
         collection.create_index([("domain", ASCENDING)], unique=True)
         collection.create_index([("exported_at", ASCENDING)])
         collection.create_index([("batch", ASCENDING)])
+        duplicates.create_index([("domain", ASCENDING)])
+        duplicates.create_index([("exported_at", ASCENDING)])
+        duplicates.create_index([("moved_at", ASCENDING)])
+        incomplete.create_index([("domain", ASCENDING)])
+        incomplete.create_index([("moved_at", ASCENDING)])
+
+        incomplete_domains = [domain for domain in domains if not complete_domain_value(domain)]
+        domains = [domain for domain in domains if complete_domain_value(domain)]
+        if incomplete_domains:
+            moved_at = datetime.now(timezone.utc)
+            incomplete.insert_many(
+                [
+                    {
+                        "domain": domain,
+                        "batch": batch,
+                        "exported_at": exported_at,
+                        "moved_at": moved_at,
+                        "source_collection": settings.mongo_collection,
+                        "incomplete_reason": "truncated_domain",
+                        "data": {
+                            "Domain": domain,
+                            "batch": batch,
+                            "exported_at": exported_at.isoformat(),
+                        },
+                    }
+                    for domain in incomplete_domains
+                ],
+                ordered=False,
+            )
+        if not domains:
+            return
+
+        existing_domains = {
+            row["domain"]
+            for row in collection.find({"domain": {"$in": domains}}, {"_id": 0, "domain": 1})
+            if row.get("domain")
+        }
         operations = []
+        duplicate_documents = []
         for domain in domains:
             document = {
                 "domain": domain,
@@ -470,18 +615,118 @@ def save_export_domains_mongo(settings: Settings, domains: list[str], source_url
                     "exported_at": exported_at.isoformat(),
                 },
             }
+            if domain in existing_domains:
+                duplicate_documents.append(
+                    {
+                        **document,
+                        "source_collection": settings.mongo_collection,
+                        "moved_at": exported_at,
+                        "duplicate_reason": "already_exists",
+                    }
+                )
+                continue
             operations.append(
                 UpdateOne(
                     {"domain": domain},
                     {
-                        "$set": document,
-                        "$setOnInsert": {"first_seen_at": exported_at},
+                        "$setOnInsert": {**document, "first_seen_at": exported_at},
                     },
                     upsert=True,
                 )
             )
         if operations:
             collection.bulk_write(operations, ordered=False)
+        if duplicate_documents:
+            duplicates.insert_many(duplicate_documents, ordered=False)
+
+
+async def run_wsc_after_export(settings: Settings, exported_count: int, batch: int) -> dict[str, Any]:
+    if not settings.wsc_auto_after_export or exported_count <= 0:
+        return {"enabled": False, "batches": 0, "submitted": 0, "saved": 0}
+
+    from website_seo_checker import run_next_batch_async
+
+    max_batches_from_export = (exported_count + settings.wsc_auto_batch_size - 1) // settings.wsc_auto_batch_size
+    max_batches = min(settings.wsc_auto_max_batches, max_batches_from_export)
+    summary = {
+        "enabled": True,
+        "batches": 0,
+        "submitted": 0,
+        "saved": 0,
+        "errors": [],
+        "nawala_submitted": 0,
+        "nawala_saved": 0,
+        "nawala_final_saved": 0,
+        "nawala_blocked": 0,
+        "nawala_not_blocked": 0,
+        "nawala_errors": 0,
+    }
+
+    for index in range(max_batches):
+        update_main_status(
+            phase="website_seo_checker",
+            status="running",
+            batch=batch,
+            wsc_batch=index + 1,
+            wsc_total_batches=max_batches,
+            wsc_submitted=summary["submitted"],
+            wsc_saved=summary["saved"],
+        )
+        try:
+            result = await run_next_batch_async(limit=settings.wsc_auto_batch_size, force=False)
+        except Exception as exc:
+            summary["errors"].append(str(exc))
+            update_main_status(
+                phase="website_seo_checker_error",
+                status="running",
+                batch=batch,
+                wsc_error=str(exc),
+                wsc_submitted=summary["submitted"],
+                wsc_saved=summary["saved"],
+            )
+            break
+
+        summary["batches"] += 1
+        summary["submitted"] += int(result.get("submitted") or 0)
+        summary["saved"] += int(result.get("saved") or 0)
+        nawala = result.get("nawala") or {}
+        if nawala.get("enabled"):
+            summary["nawala_submitted"] += int(nawala.get("submitted") or 0)
+            summary["nawala_saved"] += int(nawala.get("saved") or 0)
+            summary["nawala_final_saved"] += int(nawala.get("final_saved") or 0)
+            summary["nawala_blocked"] += int(nawala.get("blocked") or 0)
+            summary["nawala_not_blocked"] += int(nawala.get("not_blocked") or 0)
+            summary["nawala_errors"] += int(nawala.get("errors") or 0)
+            update_main_status(
+                phase="nawala_check",
+                status="running",
+                batch=batch,
+                nawala_submitted=summary["nawala_submitted"],
+                nawala_saved=summary["nawala_saved"],
+                nawala_final_saved=summary["nawala_final_saved"],
+                nawala_blocked=summary["nawala_blocked"],
+                nawala_not_blocked=summary["nawala_not_blocked"],
+                nawala_errors=summary["nawala_errors"],
+            )
+        if int(result.get("submitted") or 0) == 0:
+            break
+
+    update_main_status(
+        phase="website_seo_checker_complete",
+        status="running",
+        batch=batch,
+        wsc_batches=summary["batches"],
+        wsc_submitted=summary["submitted"],
+        wsc_saved=summary["saved"],
+        wsc_errors=summary["errors"],
+        nawala_submitted=summary["nawala_submitted"],
+        nawala_saved=summary["nawala_saved"],
+        nawala_final_saved=summary["nawala_final_saved"],
+        nawala_blocked=summary["nawala_blocked"],
+        nawala_not_blocked=summary["nawala_not_blocked"],
+        nawala_errors=summary["nawala_errors"],
+    )
+    return summary
 
 
 def check_mongo(settings: Settings) -> None:
@@ -1257,12 +1502,30 @@ async def visible_table_csv_rows(page: Page) -> tuple[list[str], list[list[str]]
             const table = document.querySelector('table.base1');
             if (!table) return { headers: [], rows: [] };
             const clean = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+            const domainFromLink = (link) => {
+                if (!link) return '';
+                const candidates = [
+                    link.getAttribute('title'),
+                    link.getAttribute('data-domain'),
+                    link.getAttribute('data-name'),
+                    link.getAttribute('aria-label'),
+                    link.textContent,
+                ];
+                const href = link.getAttribute('href') || '';
+                const match = href.match(/\\/domain\\/([^/?#]+)/i);
+                if (match) candidates.unshift(decodeURIComponent(match[1]));
+                for (const candidate of candidates) {
+                    const value = clean(candidate).split(' ')[0].toLowerCase();
+                    if (value && !value.includes('...') && !value.includes('..')) return value;
+                }
+                return clean(link.textContent).split(' ')[0].toLowerCase();
+            };
             const headers = [...table.querySelectorAll('thead th')].map((cell, index) => clean(cell.textContent) || `col_${index}`);
             const rows = [...table.querySelectorAll('tbody tr')].map((tr) => {
                 return [...tr.querySelectorAll(':scope > td')].map((cell, index) => {
                     if (index === 0) {
                         const domainLink = cell.querySelector('a.namelinks, a[href*="/domain/"], a');
-                        return clean(domainLink ? domainLink.textContent : cell.textContent).split(' ')[0];
+                        return domainLink ? domainFromLink(domainLink) : clean(cell.textContent).split(' ')[0];
                     }
                     return clean(cell.textContent);
                 });
@@ -1285,9 +1548,27 @@ async def visible_domain_link_rows(page: Page) -> tuple[list[str], list[list[str
                 const rect = element.getBoundingClientRect();
                 return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
             };
+            const clean = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+            const domainFromLink = (link) => {
+                const candidates = [
+                    link.getAttribute('title'),
+                    link.getAttribute('data-domain'),
+                    link.getAttribute('data-name'),
+                    link.getAttribute('aria-label'),
+                    link.textContent,
+                ];
+                const href = link.getAttribute('href') || '';
+                const match = href.match(/\\/domain\\/([^/?#]+)/i);
+                if (match) candidates.unshift(decodeURIComponent(match[1]));
+                for (const candidate of candidates) {
+                    const value = clean(candidate).split(' ')[0].toLowerCase();
+                    if (value && !value.includes('...') && !value.includes('..')) return value;
+                }
+                return clean(link.textContent).split(' ')[0].toLowerCase();
+            };
             return [...document.querySelectorAll('table.base1 a.namelinks, table.base1 tbody td:first-child a, a.namelinks')]
                 .filter(visible)
-                .map((link) => (link.textContent || '').replace(/\\s+/g, ' ').trim().split(' ')[0].toLowerCase())
+                .map(domainFromLink)
                 .filter(Boolean);
         }
         """
@@ -1333,8 +1614,15 @@ async def export_current_page_domains(page: Page, settings: Settings, batch: int
 
     exported_at = datetime.now(timezone.utc)
     await human_pause(settings, "saving export")
-    exported = append_domain_csv(settings.export_domains_file, domains)
+    exported = len(domains)
+    if settings.export_csv_enabled:
+        append_domain_csv(settings.export_domains_file, domains)
     save_export_domains_mongo(settings, domains, page.url, exported_at, batch)
+    wsc_summary = await run_wsc_after_export(settings, exported, batch)
+    if wsc_summary.get("enabled"):
+        verbose_print(settings, f"WSC auto submitted={wsc_summary.get('submitted')} saved={wsc_summary.get('saved')}")
+    for domain in domains:
+        verbose_print(settings, f"DOMAIN {domain}")
     return exported
 
 
@@ -1419,10 +1707,31 @@ async def login_visible(settings: Settings) -> None:
 
 
 async def scrape_once(settings: Settings) -> list[dict[str, Any]]:
+    update_main_status(phase="starting_scrape", status="running")
     filters = tld_filters()
     seen = load_seen(settings.seen_file)
     if not settings.export_domains_only and settings.target_total_domains > 0 and len(seen) >= settings.target_total_domains:
         print(f"Target reached: {len(seen)} domains saved, target is {settings.target_total_domains}.")
+        return []
+
+    cursor_data = read_page_cursor_data(settings)
+    cursor_wait_seconds = seconds_until_cursor_cycle_reset(settings, cursor_data)
+    if cursor_wait_seconds > 0:
+        page_number = cursor_data.get("next_page")
+        print(
+            f"Daily page limit reached at page {settings.daily_page_limit}; "
+            f"starting again from page {settings.start_page} in {cursor_wait_seconds}s.",
+            flush=True,
+        )
+        update_main_status(
+            phase="daily_page_limit_waiting",
+            status="running",
+            page=page_number,
+            page_limit=settings.daily_page_limit,
+            next_run_in_seconds=cursor_wait_seconds,
+        )
+        if settings.export_domains_only:
+            return [{"exported_rows": 0, "batch": int(cursor_data.get("next_batch") or 0), "cycle_wait_seconds": cursor_wait_seconds}]
         return []
 
     start_page = load_page_cursor(settings)
@@ -1436,11 +1745,13 @@ async def scrape_once(settings: Settings) -> list[dict[str, Any]]:
         browser = None
         if settings.adspower_enabled:
             print("Connecting to AdsPower browser profile...", flush=True)
+            update_main_status(phase="connecting_adspower", status="running")
             ws_endpoint = start_adspower_browser(settings)
             browser = await p.chromium.connect_over_cdp(ws_endpoint)
             context = browser.contexts[0] if browser.contexts else await browser.new_context()
         else:
             print(f"Opening Playwright browser session at {settings.state_dir}...", flush=True)
+            update_main_status(phase="opening_browser", status="running")
             context = await p.chromium.launch_persistent_context(str(settings.state_dir), headless=settings.headless)
         try:
             login_checked = False
@@ -1455,21 +1766,25 @@ async def scrape_once(settings: Settings) -> list[dict[str, Any]]:
             for page_number in range(start_page, start_page + settings.pages_per_run):
                 url = start_url if settings.export_domains_only and start_url else page_url(settings.scrape_url, page_number, settings.domains_per_page)
                 url = filtered_listing_url(url, settings)
-                print(f"Opening page {page_number}: {url}", flush=True)
+                verbose_print(settings, f"Opening page {page_number}: {url}")
+                update_main_status(phase="opening_page", status="running", page=page_number, url=url, exported_rows=exported_rows)
                 await human_pause(settings, "opening the next page")
                 page = await goto_with_retry(context, page, url)
                 await wait_for_network_quiet(page)
                 await raise_if_account_blocked(page)
                 if page_number == start_page and not start_url:
                     print("Applying site filters...", flush=True)
+                    update_main_status(phase="applying_filters", status="running", page=page_number, url=page.url)
                     await apply_site_listing_filters(page, settings)
                     await raise_if_account_blocked(page)
                 if settings.export_domains_only:
                     batch = start_batch + (page_number - start_page)
                     exported_batch = batch
-                    print(f"Exporting domains to {settings.export_domains_file} batch={batch}...", flush=True)
+                    verbose_print(settings, f"Exporting domains to {settings.export_domains_file} batch={batch}...")
+                    update_main_status(phase="exporting", status="running", page=page_number, batch=batch, url=page.url)
                     exported_rows += await export_current_page_domains(page, settings, batch)
-                    print(f"Exported {exported_rows} domains so far.", flush=True)
+                    verbose_print(settings, f"Exported {exported_rows} domains so far.")
+                    update_main_status(phase="exported", status="running", page=page_number, batch=batch, exported_rows=exported_rows)
                     next_page = page_number + 1
                     next_url = await next_page_url(page)
                     if next_url:
@@ -1519,33 +1834,64 @@ async def scrape_once(settings: Settings) -> list[dict[str, Any]]:
                 await context.close()
 
     if settings.export_domains_only:
+        update_main_status(phase="scrape_complete", status="running", exported_rows=exported_rows, batch=exported_batch)
         return [{"exported_rows": exported_rows, "batch": exported_batch}]
 
     save_results(settings, new_rows, seen)
+    update_main_status(phase="scrape_complete", status="running", saved_rows=len(new_rows), total_seen=len(seen))
     return new_rows
 
 
 async def run_forever(settings: Settings) -> None:
+    update_main_status(status="running", phase="started", interval_seconds=settings.interval_seconds)
     while True:
         started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
             rows = await scrape_once(settings)
+            cycle_wait_seconds = int(rows[0].get("cycle_wait_seconds", 0)) if rows else 0
+            sleep_seconds = min(settings.interval_seconds, cycle_wait_seconds) if cycle_wait_seconds > 0 else settings.interval_seconds
             if settings.export_domains_only:
                 exported_rows = int(rows[0].get("exported_rows", 0)) if rows else 0
                 batch = int(rows[0].get("batch", 0)) if rows else 0
-                print(f"[{started}] exported {exported_rows} domains to {settings.export_domains_file}, batch={batch}")
-                await asyncio.sleep(settings.interval_seconds)
+                if cycle_wait_seconds > 0:
+                    print(f"[{started}] page limit reached; waiting {cycle_wait_seconds}s before restarting page 1")
+                else:
+                    print(f"[{started}] exported {exported_rows} domains to {settings.export_domains_file}, batch={batch}")
+                update_main_status(
+                    status="sleeping",
+                    phase="daily_page_limit_waiting" if cycle_wait_seconds > 0 else "waiting_next_run",
+                    last_run_started=started,
+                    last_exported_rows=exported_rows,
+                    last_batch=batch,
+                    page_limit=settings.daily_page_limit,
+                    interval_seconds=settings.interval_seconds,
+                    next_run_in_seconds=sleep_seconds,
+                )
+                await asyncio.sleep(sleep_seconds)
                 continue
             total = len(load_seen(settings.seen_file))
             print(f"[{started}] saved {len(rows)} new matching domains, total={total}")
+            update_main_status(
+                status="sleeping",
+                phase="daily_page_limit_waiting" if cycle_wait_seconds > 0 else "waiting_next_run",
+                last_run_started=started,
+                last_saved_rows=len(rows),
+                total=total,
+                page_limit=settings.daily_page_limit,
+                interval_seconds=settings.interval_seconds,
+                next_run_in_seconds=sleep_seconds,
+            )
             if settings.target_total_domains > 0 and total >= settings.target_total_domains:
                 print(f"[{started}] target reached: {total}/{settings.target_total_domains}")
+                update_main_status(status="complete", phase="target_reached", total=total, target=settings.target_total_domains)
                 break
         except AccountBlockedError as exc:
             print(f"[{started}] STOPPED: {exc}", file=sys.stderr)
+            update_main_status(status="stopped", phase="account_blocked", error=str(exc), last_run_started=started)
             break
         except Exception as exc:
             print(f"[{started}] ERROR: {exc}")
+            update_main_status(status="error", phase="error", error=str(exc), last_run_started=started)
         await asyncio.sleep(settings.interval_seconds)
 
 
@@ -1581,6 +1927,9 @@ def main() -> None:
                 print(f"saved {len(rows)} new matching domains")
         else:
             asyncio.run(run_forever(settings))
+    except KeyboardInterrupt:
+        update_main_status(status="stopped", phase="interrupted", error="Stopped by user")
+        print("Stopped by user.")
     except (AccountBlockedError, RuntimeError, PlaywrightError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

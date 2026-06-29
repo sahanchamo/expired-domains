@@ -1,0 +1,18 @@
+{
+  "url": "https://member.expireddomains.net/domains/combinedexpired/#listing",
+  "exact_filters": {
+    "flimit": "200",
+    "ftldsblock": ".dk, .cl, .pt, .sk, .lt, .ro, *.jp, .*au, .no, .jp, *.jp, .hr, .nu, .au, .ee, .ar, .*ar, .nz, .ie, .it, .au, .lu, .rs, .hu, .es, .eu, .*nz, .*at, .at, .se, .kz, .md, *.es, .sm, .tc, .hk, .ca, .ch, .co.uk, .is, .xyz, .be, .cz, .il, .tv, .org.il, .si, .ma, .lv, .by, .ru, .ir, .fi, .info, .care, .cloud, .blog, .hk, .me, .su, .store, .shop, .online, .tw, .com.tw, .vip, .top, .site, .sbs, .live, .monster, .cn, .com.br, .com.ua, .pl, com.cn, .life, .fun, .ai, .ae, .com.my, .fr, .co.il, .com.tr, .org.ua, .tl, .co.za, .net.cn, .ooo, .org.cn, .co.tz, .gov.cn, .cat, .co.kr, .co.id, .id, .cc, .biz.id, .com.sg, .com.hr, org.tw, .re, .pe, .com.pl, .ge, .bg, .org.tr, .tn, .biz.in, .com.ve",
+    "fmseotf": "1"
+  },
+  "controls": [
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "q",
+      "id": "",
+      "value": "",
+      "nearby_text": "Search"
+    }
+  ]
+}

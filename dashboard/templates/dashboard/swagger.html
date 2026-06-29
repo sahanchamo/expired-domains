@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Expired Domains API Docs</title>
+  <script>
+    tailwind = {
+      config: {
+        important: true,
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #f1f5f9; }
+    .topbar {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 24px;
+      background: #0f172a;
+      color: #fff;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+    }
+    .topbar a {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      color: #e0f2fe;
+      padding: 8px 12px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .topbar a:hover { background: rgba(255, 255, 255, 0.09); }
+    #swagger-ui { max-width: 1500px; margin: 18px auto 0; padding-inline: 16px; }
+    @media (max-width: 640px) {
+      .topbar { align-items: flex-start; flex-direction: column; padding: 14px 16px; }
+      .topbar nav { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .topbar a { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="flex items-center gap-3">
+      <div class="grid h-10 w-10 place-items-center rounded-lg bg-sky-400/15 text-xs font-black text-sky-200">ED</div>
+      <div>
+        <strong class="block text-lg font-black leading-tight">Expired Domains API</strong>
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Developer Docs</span>
+      </div>
+    </div>
+    <nav class="flex items-center gap-2">
+      <a href="/">Dashboard</a>
+      <a href="/api/schema/">OpenAPI JSON</a>
+    </nav>
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: "/api/schema/",
+      dom_id: "#swagger-ui",
+      deepLinking: true,
+      persistAuthorization: true,
+      displayRequestDuration: true,
+    });
+  </script>
+</body>
+</html>

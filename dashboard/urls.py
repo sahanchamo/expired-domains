@@ -1,0 +1,40 @@
+from django.urls import path
+
+from . import views
+
+
+urlpatterns = [
+    path("login/", views.login_view, name="login"),
+    path("logout/", views.logout_view, name="logout"),
+    path("", views.dashboard, name="dashboard"),
+    path("ui/", views.dashboard, name="dashboard-ui"),
+    path("api/docs/", views.swagger_docs, name="swagger-docs"),
+    path("api/schema/", views.api_schema, name="api-schema"),
+    path("api/health/", views.health, name="health"),
+    path("api/main/start/", views.main_start, name="main-start"),
+    path("api/main/stop/", views.main_stop, name="main-stop"),
+    path("api/main/restart/", views.main_restart, name="main-restart"),
+    path("api/main/status/", views.main_status, name="main-status"),
+    path("api/main/logs/", views.main_logs, name="main-logs"),
+    path("api/database/backup/", views.database_backup, name="database-backup"),
+    path("api/database/restore/", views.database_restore, name="database-restore"),
+    path("api/scraper/settings/", views.scraper_settings, name="scraper-settings"),
+    path("api/scraper/interval/", views.scraper_interval, name="scraper-interval"),
+    path("api/scraper/start-page-1/", views.scraper_start_from_first_page, name="scraper-start-page-1"),
+    path("api/domains/", views.domains, name="domains"),
+    path("api/duplicates/", views.duplicate_domains, name="duplicate-domains"),
+    path("api/domains/<str:domain>/", views.domain_detail, name="domain-detail"),
+    path("api/batches/", views.batches, name="batches"),
+    path("api/seo/check/", views.seo_check, name="seo-check"),
+    path("api/seo/jobs/<str:job_id>/", views.seo_job, name="seo-job"),
+    path("api/seo/checks/", views.seo_checks, name="seo-checks"),
+    path("api/seo/rankings/", views.seo_rankings, name="seo-rankings"),
+    path("api/seo/sheet/", views.seo_sheet, name="seo-sheet"),
+    path("api/wsc/check/", views.wsc_check, name="wsc-check"),
+    path("api/wsc/jobs/<str:job_id>/", views.wsc_job, name="wsc-job"),
+    path("api/wsc/results/", views.wsc_results, name="wsc-results"),
+    path("api/nawala/check/", views.nawala_check, name="nawala-check"),
+    path("api/nawala/jobs/<str:job_id>/", views.nawala_job, name="nawala-job"),
+    path("api/nawala/results/", views.nawala_results, name="nawala-results"),
+    path("api/domain-lists/", views.seo_checker_false_results, name="domain-lists"),
+]

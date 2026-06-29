@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login - Expired Domains Dashboard</title>
+  <script>
+    tailwind = {
+      config: {
+        important: true,
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+            },
+            boxShadow: {
+              panel: "0 12px 28px rgba(22, 32, 42, 0.08)",
+              premium: "0 24px 60px rgba(15, 23, 42, 0.14)",
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #17202a;
+      --muted: #5d6b7a;
+      --line: #d8e0e7;
+      --blue: #1d6fb8;
+      --red: #c83c3c;
+      --shadow: 0 12px 28px rgba(22, 32, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .login {
+      width: min(420px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .brand {
+      display: grid;
+      gap: 6px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    form {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    input {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 11px;
+      background: #ffffff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    button {
+      min-height: 42px;
+      border: 1px solid var(--blue);
+      border-radius: 8px;
+      background: var(--blue);
+      color: #ffffff;
+      padding: 9px 12px;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 650;
+    }
+
+    .error {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      border: 1px solid rgba(200, 60, 60, 0.25);
+      border-radius: 8px;
+      background: rgba(200, 60, 60, 0.08);
+      color: var(--red);
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body class="grid min-h-screen place-items-center bg-slate-100 p-4 text-slate-950 antialiased sm:p-6">
+  <main class="login grid w-full max-w-[440px] gap-6 rounded-xl border border-slate-200/80 bg-white p-5 shadow-premium sm:p-8">
+    <div class="brand flex items-center gap-3">
+      <div class="grid h-12 w-12 place-items-center rounded-xl bg-slate-950 text-sm font-black text-sky-200">ED</div>
+      <div class="min-w-0">
+        <h1 class="text-2xl font-black leading-tight">Expired Domains</h1>
+        <p class="text-sm font-medium text-slate-500">Sign in to open the control center.</p>
+      </div>
+    </div>
+    {% if error %}
+      <div class="error flex min-h-10 items-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{{ error }}</div>
+    {% endif %}
+    <form class="grid gap-4" method="post" action="/login/">
+      <input type="hidden" name="next" value="{{ next }}">
+      <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+        Username
+        <input class="min-h-11 rounded-lg border border-slate-300/80 bg-white px-3 py-2 font-medium text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100" name="username" autocomplete="username" required autofocus>
+      </label>
+      <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+        Password
+        <input class="min-h-11 rounded-lg border border-slate-300/80 bg-white px-3 py-2 font-medium text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100" name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="mt-1 min-h-11 rounded-lg border border-blue-700 bg-blue-700 px-4 py-2 font-bold text-white shadow-lg shadow-blue-700/15 transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-sky-100" type="submit">Login</button>
+    </form>
+  </main>
+</body>
+</html>

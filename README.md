@@ -23,6 +23,20 @@ ExpiredDomains.net labels the login field as `Username`. If email login returns 
 
 ## Run
 
+Run the Django GUI:
+
+```powershell
+.\venv\Scripts\python.exe manage.py runserver 127.0.0.1:8001 --noreload
+```
+
+Open:
+
+```text
+http://127.0.0.1:8001/
+```
+
+Use the dashboard buttons to start or stop the scraper.
+
 Scrape one time:
 
 ```powershell

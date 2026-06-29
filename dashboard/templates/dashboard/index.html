@@ -1,0 +1,2308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Expired Domains Dashboard</title>
+  <script>
+    tailwind = {
+      config: {
+        important: true,
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+              mono: ["ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
+            },
+            boxShadow: {
+              panel: "0 12px 28px rgba(22, 32, 42, 0.08)",
+              premium: "0 18px 42px rgba(15, 23, 42, 0.10)",
+              lift: "0 10px 24px rgba(37, 99, 235, 0.16)",
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --panel-soft: #eef3f7;
+      --ink: #17202a;
+      --muted: #5d6b7a;
+      --line: #d8e0e7;
+      --blue: #1d6fb8;
+      --green: #16845f;
+      --red: #c83c3c;
+      --shadow: 0 12px 28px rgba(22, 32, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, select { font: inherit; }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      background: #17202a;
+      color: #f8fafc;
+      padding: 24px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .brand {
+      display: grid;
+      gap: 4px;
+      padding: 0 6px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    .brand strong {
+      font-size: 19px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .brand span {
+      color: #aebdca;
+      font-size: 13px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 8px;
+    }
+
+    .nav button {
+      width: 100%;
+      min-height: 40px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #d9e2ec;
+      text-align: left;
+      padding: 9px 11px;
+      cursor: pointer;
+    }
+
+    .nav button.active,
+    .nav button:hover {
+      background: rgba(255, 255, 255, 0.11);
+      color: #ffffff;
+    }
+
+    .main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 28px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .content {
+      min-width: 0;
+      width: 100%;
+      max-width: 1440px;
+      padding: 24px 28px 36px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--ink);
+      padding: 8px 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+
+    .btn.primary {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #ffffff;
+    }
+
+    .btn.danger {
+      background: var(--red);
+      border-color: var(--red);
+      color: #ffffff;
+    }
+
+    .btn.success {
+      background: var(--green);
+      border-color: var(--green);
+      color: #ffffff;
+    }
+
+    .btn:disabled {
+      opacity: 0.58;
+      cursor: wait;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .stats {
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      min-height: 112px;
+      display: grid;
+      align-content: space-between;
+      gap: 12px;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .stat strong {
+      font-size: 28px;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      min-height: 30px;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--panel-soft);
+      color: var(--muted);
+      font-weight: 650;
+      font-size: 13px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex: 0 0 auto;
+    }
+
+    .dot.on { background: var(--green); }
+    .dot.off { background: var(--red); }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+      background: #ffffff;
+    }
+
+    .pager-info {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pager-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    input, select {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #ffffff;
+      color: var(--ink);
+      min-width: 0;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    th, td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+    }
+
+    th {
+      color: var(--muted);
+      background: #f8fafc;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    td { overflow-wrap: anywhere; }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }
+
+    pre {
+      margin: 0;
+      min-height: 260px;
+      max-height: 420px;
+      overflow: auto;
+      white-space: pre-wrap;
+      background: #101820;
+      color: #dbe7f0;
+      padding: 16px;
+      line-height: 1.5;
+      font-size: 12px;
+    }
+
+    .hidden { display: none !important; }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: min(420px, calc(100vw - 36px));
+      background: #17202a;
+      color: #ffffff;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      z-index: 20;
+    }
+
+    .empty {
+      padding: 28px 16px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 14px;
+      }
+      .brand { padding-bottom: 12px; }
+      .nav { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+      .nav button {
+        text-align: center;
+        padding-inline: 8px;
+      }
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 18px;
+      }
+      .toolbar { justify-content: flex-start; }
+      .content { padding: 18px; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 560px) {
+      .stats { grid-template-columns: 1fr; }
+      .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .panel-head {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .filters { justify-content: stretch; }
+      .filters > * { width: 100%; }
+    }
+
+    body.premium-dashboard {
+      background:
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 44%, #f8fafc 100%);
+    }
+
+    body.premium-dashboard .sidebar {
+      background: #0f172a;
+      box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.08);
+    }
+
+    body.premium-dashboard .nav button {
+      position: relative;
+      isolation: isolate;
+    }
+
+    body.premium-dashboard .nav button.active::before {
+      content: "";
+      position: absolute;
+      inset: 8px auto 8px 0;
+      width: 3px;
+      border-radius: 999px;
+      background: #38bdf8;
+    }
+
+    body.premium-dashboard .panel,
+    body.premium-dashboard .stat {
+      border-color: rgba(148, 163, 184, 0.35);
+    }
+
+    body.premium-dashboard tr:hover td {
+      background: #f8fafc;
+    }
+
+    body.premium-dashboard .btn {
+      transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+    }
+
+    body.premium-dashboard .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: #f8fafc;
+      border-color: #94a3b8;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.10);
+    }
+
+    body.premium-dashboard .btn.primary:hover:not(:disabled) {
+      background: #1d4ed8;
+      border-color: #1d4ed8;
+      color: #ffffff;
+      box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
+    }
+
+    body.premium-dashboard .btn.success:hover:not(:disabled) {
+      background: #047857;
+      border-color: #047857;
+      color: #ffffff;
+      box-shadow: 0 14px 28px rgba(5, 150, 105, 0.22);
+    }
+
+    body.premium-dashboard .btn.danger:hover:not(:disabled) {
+      background: #b91c1c;
+      border-color: #b91c1c;
+      color: #ffffff;
+      box-shadow: 0 14px 28px rgba(220, 38, 38, 0.18);
+    }
+
+    body.premium-dashboard #settingsTab .duration-preset:hover:not(:disabled) {
+      background: #eff6ff;
+      border-color: #60a5fa;
+      color: #1d4ed8;
+    }
+
+    body.premium-dashboard #settingsTab .setting-card {
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    body.premium-dashboard #settingsTab .setting-card:hover {
+      border-color: rgba(96, 165, 250, 0.55);
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .progress-flow {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(92px, 1fr));
+      gap: 12px;
+    }
+
+    .flow-node {
+      position: relative;
+      min-height: 116px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 14px;
+      background: #ffffff;
+      padding: 16px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+      transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .flow-node.active {
+      border-color: #38bdf8;
+      box-shadow: 0 18px 36px rgba(14, 165, 233, 0.18);
+      transform: translateY(-2px);
+    }
+
+    .flow-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      box-shadow: 0 0 0 6px rgba(203, 213, 225, 0.24);
+    }
+
+    .flow-node.active .flow-dot {
+      background: #0ea5e9;
+      animation: progressPulse 1.25s ease-in-out infinite;
+    }
+
+    .progress-track {
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e2e8f0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #0ea5e9, #2563eb);
+      transition: width 480ms ease;
+    }
+
+    .progress-fill.success {
+      background: linear-gradient(90deg, #10b981, #059669);
+    }
+
+    .progress-orb {
+      width: 132px;
+      height: 132px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(#2563eb var(--progress-angle, 0deg), #e2e8f0 0deg);
+      box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.28), 0 18px 36px rgba(37, 99, 235, 0.16);
+    }
+
+    .progress-orb::before {
+      content: "";
+      position: absolute;
+      width: 104px;
+      height: 104px;
+      border-radius: 999px;
+      background: #ffffff;
+    }
+
+    .progress-orb > span {
+      position: relative;
+      z-index: 1;
+    }
+
+    @keyframes progressPulse {
+      0%, 100% { box-shadow: 0 0 0 6px rgba(14, 165, 233, 0.18); }
+      50% { box-shadow: 0 0 0 12px rgba(14, 165, 233, 0.05); }
+    }
+
+    @media (max-width: 960px) {
+      .progress-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 560px) {
+      .progress-flow { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body class="premium-dashboard min-w-[320px] bg-slate-50 text-slate-950 antialiased">
+  <div class="app min-h-screen lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
+    <aside class="sidebar sticky top-0 z-20 flex flex-col gap-5 bg-slate-950 px-4 py-4 text-white lg:min-h-screen lg:gap-7 lg:px-5 lg:py-6">
+      <div class="brand flex items-center gap-3 border-b border-white/10 px-1 pb-4">
+        <div class="grid h-11 w-11 place-items-center rounded-lg border border-white/10 bg-sky-400/15 text-sm font-black text-sky-200 shadow-inner">ED</div>
+        <div class="min-w-0">
+          <strong class="block truncate text-lg font-bold leading-tight">Expired Domains</strong>
+          <span class="text-xs font-medium uppercase tracking-wider text-slate-400">Control Center</span>
+        </div>
+      </div>
+      <nav class="nav grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1" aria-label="Dashboard sections">
+        <button class="active" data-tab="overview">Overview</button>
+        <button data-tab="domains">Domains</button>
+        <button data-tab="duplicates">Duplicates</button>
+        <button data-tab="wsc">SEO Results</button>
+        <button data-tab="nawala">Nawala</button>
+        <button data-tab="domainLists">Domain Lists</button>
+        <button data-tab="seo">Basic SEO</button>
+        <button data-tab="logs">Logs</button>
+        <button data-tab="database">Database</button>
+        <button data-tab="settings">Settings</button>
+      </nav>
+    </aside>
+
+    <main class="main min-w-0">
+      <header class="topbar sticky top-0 z-10 flex min-h-[82px] flex-col gap-4 border-b border-slate-200/80 bg-white/90 px-4 py-4 shadow-sm backdrop-blur sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div class="min-w-0">
+          <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Dashboard</div>
+          <h1 class="truncate text-2xl font-bold leading-tight text-slate-950 sm:text-3xl" id="pageTitle">Overview</h1>
+          <div class="subtitle mt-1 text-sm text-slate-600" id="pageSubtitle">Monitor the scraper and exported domains.</div>
+        </div>
+        <div class="toolbar flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
+          <span class="status-pill"><span id="runDot" class="dot"></span><span id="runText">Checking</span></span>
+          <button class="btn success" id="startBtn" type="button">Start</button>
+          <button class="btn primary" id="restartBtn" type="button">Run Again</button>
+          <button class="btn" id="startFirstPageBtn" type="button">Start Page 1</button>
+          <button class="btn danger" id="stopBtn" type="button">Stop</button>
+          <button class="btn" id="refreshBtn" type="button">Refresh</button>
+          <a class="btn" href="/logout/">Logout</a>
+        </div>
+      </header>
+
+      <section class="content mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="overviewTab">
+        <div class="grid stats grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div class="stat">
+            <div class="flex items-center justify-between gap-3"><span>Database Domains</span><i class="metric-badge bg-sky-50 text-sky-700">DB</i></div>
+            <strong id="dbDomains">-</strong>
+            <small>Total records stored</small>
+          </div>
+          <div class="stat">
+            <div class="flex items-center justify-between gap-3"><span>Without Duplicates</span><i class="metric-badge bg-emerald-50 text-emerald-700">UQ</i></div>
+            <strong id="uniqueDomains">-</strong>
+            <small>Clean export candidates</small>
+          </div>
+          <div class="stat">
+            <div class="flex items-center justify-between gap-3"><span>SEO Rank Checks</span><i class="metric-badge bg-violet-50 text-violet-700">SR</i></div>
+            <strong id="seoRankChecks">-</strong>
+            <small>Website checker results</small>
+          </div>
+          <div class="stat">
+            <div class="flex items-center justify-between gap-3"><span>Nawala Check URLs</span><i class="metric-badge bg-rose-50 text-rose-700">NW</i></div>
+            <strong id="nawalaCheckUrls">-</strong>
+            <small>Checked URL records</small>
+          </div>
+          <div class="stat">
+            <div class="flex items-center justify-between gap-3"><span>Exported This Run</span><i class="metric-badge bg-amber-50 text-amber-700">EX</i></div>
+            <strong id="exportedRows">-</strong>
+            <small>Latest scraper output</small>
+          </div>
+        </div>
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Live Status</h2>
+            <span class="status-pill" id="nextRun">Next run: -</span>
+          </div>
+          <div class="table-wrap">
+            <table><tbody id="statusTable"></tbody></table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Recent Batches</h2>
+            <button class="btn" id="loadBatchesBtn" type="button">Load Batches</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Batch</th><th>Count</th><th>Exported At</th></tr></thead>
+              <tbody id="batchesBody"><tr><td colspan="3" class="empty">No batches loaded yet.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <h2>SEO Rank Checks</h2>
+            <button class="btn" id="loadRecentWscBtn" type="button">Load Results</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>URL</th><th>Title</th><th>DA</th><th>PA</th><th>TBL</th><th>QBL</th><th>Q/T</th><th>OS</th><th>MT</th><th>SS</th><th>DH</th><th>Nawala</th><th>Blocked</th><th>Checked</th></tr></thead>
+              <tbody id="recentWscBody"><tr><td colspan="14" class="empty">No rank checks loaded yet.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="domainsTab">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Domains</h2>
+            <div class="filters">
+              <input id="batchInput" type="number" min="1" placeholder="Batch">
+              <input id="dateFromInput" type="date" aria-label="Exported from date">
+              <input id="dateToInput" type="date" aria-label="Exported to date">
+              <select id="domainLimit">
+                <option value="50">50 rows</option>
+                <option value="100" selected>100 rows</option>
+                <option value="250">250 rows</option>
+                <option value="500">500 rows</option>
+              </select>
+              <button class="btn" id="clearDomainFiltersBtn" type="button">Clear</button>
+              <button class="btn primary" id="loadDomainsBtn" type="button">Load</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Domain</th><th>Batch</th><th>Exported At</th><th>Data</th></tr></thead>
+              <tbody id="domainsBody"><tr><td colspan="4" class="empty">Load domains to view results.</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span class="pager-info" id="domainsPagerInfo">No rows loaded.</span>
+            <div class="pager-actions">
+              <span class="status-pill" id="domainsUniqueLabel">Without duplicates: -</span>
+              <button class="btn" id="prevDomainsBtn" type="button">Previous</button>
+              <span class="status-pill" id="domainsPageLabel">Page -</span>
+              <button class="btn" id="nextDomainsBtn" type="button">Next</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="duplicatesTab">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Duplicate Domains</h2>
+            <div class="filters">
+              <input id="duplicateSearch" type="search" placeholder="Domain contains">
+              <select id="duplicateLimit">
+                <option value="50">50 rows</option>
+                <option value="100" selected>100 rows</option>
+                <option value="250">250 rows</option>
+                <option value="500">500 rows</option>
+              </select>
+              <button class="btn" id="clearDuplicatesBtn" type="button">Clear</button>
+              <button class="btn primary" id="loadDuplicatesBtn" type="button">Load</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Domain</th><th>Batch</th><th>Exported At</th><th>Moved At</th><th>Reason</th></tr></thead>
+              <tbody id="duplicatesBody"><tr><td colspan="5" class="empty">Load duplicates to view archived records.</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span class="pager-info" id="duplicatesPagerInfo">No rows loaded.</span>
+            <div class="pager-actions">
+              <button class="btn" id="prevDuplicatesBtn" type="button">Previous</button>
+              <span class="status-pill" id="duplicatesPageLabel">Page -</span>
+              <button class="btn" id="nextDuplicatesBtn" type="button">Next</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="wscTab">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Website SEO Checker</h2>
+            <div class="filters">
+              <input id="wscSearch" type="search" placeholder="Domain contains">
+              <input id="wscDaMin" type="number" min="0" max="100" placeholder="DA min">
+              <input id="wscDaMax" type="number" min="0" max="100" placeholder="DA max">
+              <input id="wscPaMin" type="number" min="0" max="100" placeholder="PA min">
+              <input id="wscPaMax" type="number" min="0" max="100" placeholder="PA max">
+              <input id="wscTblMin" type="number" min="0" placeholder="TBL min" value="0">
+              <input id="wscTblMax" type="number" min="0" placeholder="TBL max" value="1000">
+              <input id="wscQblMin" type="number" min="0" placeholder="QBL min" value="10">
+              <input id="wscQblMax" type="number" min="0" placeholder="QBL max" value="1000">
+              <input id="wscQtMin" type="number" min="0" max="100" placeholder="Q/T min" value="5">
+              <input id="wscQtMax" type="number" min="0" max="100" placeholder="Q/T max" value="100">
+              <input id="wscOsMin" type="number" min="0" max="100" placeholder="OS min">
+              <input id="wscOsMax" type="number" min="0" max="100" placeholder="OS max">
+              <input id="wscSsMin" type="number" min="0" max="100" placeholder="SS min" value="1">
+              <input id="wscSsMax" type="number" min="0" max="100" placeholder="SS max" value="11">
+              <select id="wscLimit">
+                <option value="50">50 rows</option>
+                <option value="100" selected>100 rows</option>
+                <option value="250">250 rows</option>
+              </select>
+              <button class="btn" id="clearWscFiltersBtn" type="button">Clear</button>
+              <button class="btn success" id="runWscBtn" type="button">Check 50</button>
+              <button class="btn primary" id="loadWscBtn" type="button">Load</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>URL</th><th>Title</th><th>DA</th><th>PA</th><th>TBL</th><th>QBL</th><th>Q/T</th><th>OS</th><th>MT</th><th>SS</th><th>DH</th><th>Nawala</th><th>Blocked</th><th>Checked</th></tr></thead>
+              <tbody id="wscBody"><tr><td colspan="14" class="empty">Run or load Website SEO Checker results.</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span class="pager-info" id="wscPagerInfo">No rows loaded.</span>
+            <div class="pager-actions">
+              <button class="btn" id="prevWscBtn" type="button">Previous</button>
+              <span class="status-pill" id="wscPageLabel">Page -</span>
+              <button class="btn" id="nextWscBtn" type="button">Next</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="nawalaTab">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Nawala Results <span class="status-pill" id="nawalaTotalCount">Filtered: -</span></h2>
+            <div class="filters">
+              <input id="nawalaSearch" type="search" placeholder="Domain contains">
+              <select id="nawalaBlocked">
+                <option value="">Any status</option>
+                <option value="true">Blocked</option>
+                <option value="false">Not blocked</option>
+              </select>
+              <input id="nawalaSsMin" type="number" min="0" max="100" value="1" placeholder="SS min">
+              <input id="nawalaSsMax" type="number" min="0" max="100" value="1" placeholder="SS max">
+              <select id="nawalaLimit">
+                <option value="50">50 rows</option>
+                <option value="100" selected>100 rows</option>
+                <option value="250">250 rows</option>
+                <option value="500">500 rows</option>
+              </select>
+              <input id="nawalaRunLimit" type="number" min="1" max="5000" value="1500" placeholder="Run limit">
+              <button class="btn success" id="runNawalaBtn" type="button">Run Nawala</button>
+              <button class="btn primary" id="loadNawalaBtn" type="button">Load</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Domain</th><th>Nawala</th><th>Blocked</th><th>DA</th><th>PA</th><th>TBL</th><th>QBL</th><th>Q/T</th><th>SS</th><th>Title</th><th>Checked</th></tr></thead>
+              <tbody id="nawalaBody"><tr><td colspan="11" class="empty">Load Nawala results.</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span class="pager-info" id="nawalaPagerInfo">No rows loaded.</span>
+            <div class="pager-actions">
+              <button class="btn" id="prevNawalaBtn" type="button">Previous</button>
+              <span class="status-pill" id="nawalaPageLabel">Page -</span>
+              <button class="btn" id="nextNawalaBtn" type="button">Next</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="domainListsTab">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Domain Lists</h2>
+              <p class="mt-1 text-sm font-medium text-slate-500">Build the same filtered request as /api/domain-lists/ without writing headers by hand.</p>
+            </div>
+            <div class="filters">
+              <input id="domainListsLimit" type="number" min="1" max="5000" value="1000" placeholder="Limit">
+              <input id="domainListsLastHours" type="number" min="0" max="8760" value="24" placeholder="X-Last-Hours">
+              <button class="btn" id="clearDomainListsBtn" type="button">Clear</button>
+              <button class="btn primary" id="loadDomainListsBtn" type="button">Load List</button>
+            </div>
+          </div>
+          <div class="grid gap-4 border-b border-slate-200/80 p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="setting-card">
+              <h3 class="font-black text-slate-950">TBL Range</h3>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <input id="domainListsTblMin" type="number" min="0" value="0" placeholder="X-TBL-Min">
+                <input id="domainListsTblMax" type="number" min="0" value="1000" placeholder="X-TBL-Max">
+              </div>
+            </div>
+            <div class="setting-card">
+              <h3 class="font-black text-slate-950">QBL Range</h3>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <input id="domainListsQblMin" type="number" min="0" value="1" placeholder="X-QBL-Min">
+                <input id="domainListsQblMax" type="number" min="0" value="1000" placeholder="X-QBL-Max">
+              </div>
+            </div>
+            <div class="setting-card">
+              <h3 class="font-black text-slate-950">Q/T Range</h3>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <input id="domainListsQtMin" type="number" min="0" max="100" value="5" placeholder="X-QT-Min">
+                <input id="domainListsQtMax" type="number" min="0" max="100" value="100" placeholder="X-QT-Max">
+              </div>
+            </div>
+            <div class="setting-card">
+              <h3 class="font-black text-slate-950">SS Range</h3>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <input id="domainListsSsMin" type="number" min="0" max="100" value="1" placeholder="X-SS-Min">
+                <input id="domainListsSsMax" type="number" min="0" max="100" value="11" placeholder="X-SS-Max">
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Domain</th><th>DA</th><th>PA</th><th>TBL</th><th>QBL</th><th>Q/T</th><th>SS</th><th>Title</th><th>Nawala</th><th>Checked</th></tr></thead>
+              <tbody id="domainListsBody"><tr><td colspan="10" class="empty">Load a filtered domain list.</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span class="pager-info" id="domainListsPagerInfo">No rows loaded.</span>
+            <div class="pager-actions">
+              <span class="status-pill" id="domainListsFilterLabel">Last 24 hours</span>
+              <button class="btn" id="prevDomainListsBtn" type="button">Previous</button>
+              <span class="status-pill" id="domainListsPageLabel">Page -</span>
+              <button class="btn" id="nextDomainListsBtn" type="button">Next</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="seoTab">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>SEO Checks</h2>
+            <div class="filters">
+              <input id="seoSearch" type="search" placeholder="Domain contains">
+              <input id="minScore" type="number" min="0" max="100" placeholder="Min score">
+              <select id="reachableFilter">
+                <option value="">Any reachability</option>
+                <option value="true">Reachable</option>
+                <option value="false">Unreachable</option>
+              </select>
+              <button class="btn success" id="runSeoBtn" type="button">Run SEO Check</button>
+              <button class="btn primary" id="loadSeoBtn" type="button">Load</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Domain</th><th>Score</th><th>Reachable</th><th>Title</th><th>Checked</th></tr></thead>
+              <tbody id="seoBody"><tr><td colspan="5" class="empty">Load SEO checks to view results.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="logsTab">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Process Logs</h2>
+            <div class="filters">
+              <select id="logLines">
+                <option value="100" selected>100 lines</option>
+                <option value="250">250 lines</option>
+                <option value="500">500 lines</option>
+                <option value="1000">1000 lines</option>
+              </select>
+              <button class="btn primary" id="loadLogsBtn" type="button">Load Logs</button>
+            </div>
+          </div>
+          <pre id="logsOutput">Logs will appear here.</pre>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="databaseTab">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Database Backup</h2>
+              <p class="mt-1 text-sm font-medium text-slate-500">Download or restore MongoDB data with gzip backup files.</p>
+            </div>
+            <button class="btn primary" id="downloadDbBackupBtn" type="button">Download Backup</button>
+          </div>
+          <div class="grid gap-5 p-4 sm:p-5 xl:grid-cols-2">
+            <div class="setting-card">
+              <div>
+                <h3 class="text-lg font-black text-slate-950">Backup</h3>
+                <p class="mt-1 text-sm font-medium text-slate-500">Creates a compressed JSON backup of the configured MongoDB database.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button class="btn primary" id="downloadDbBackupCardBtn" type="button">Download .gz</button>
+                <span class="status-pill" id="dbBackupStatus">Ready</span>
+              </div>
+            </div>
+            <div class="setting-card">
+              <div>
+                <h3 class="text-lg font-black text-slate-950">Restore</h3>
+                <p class="mt-1 text-sm font-medium text-slate-500">Restores collections from a dashboard gzip backup file.</p>
+              </div>
+              <input id="dbRestoreFile" type="file" accept=".gz,application/gzip,application/x-gzip">
+              <div class="flex flex-wrap items-center gap-2">
+                <button class="btn danger" id="restoreDbBackupBtn" type="button">Restore .gz</button>
+                <span class="status-pill" id="dbRestoreStatus">No file selected</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="progressTab">
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div class="stat"><span>Phase</span><strong id="progressPhase">-</strong><small id="progressStatus">Status: -</small></div>
+          <div class="stat"><span>Current Page</span><strong id="progressPage">-</strong><small id="progressBatch">Batch: -</small></div>
+          <div class="stat"><span>Exported Rows</span><strong id="progressExported">-</strong><small id="progressLastRun">Last run: -</small></div>
+          <div class="stat"><span>Next Run</span><strong id="progressNextRun">-</strong><small id="progressUpdated">Updated: -</small></div>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Live Scraper Progress</h2>
+              <p class="mt-1 text-sm font-medium text-slate-500">Animated view of the current scraper cycle.</p>
+            </div>
+            <div class="filters">
+              <span class="status-pill" id="progressRefreshState">Auto refresh: on</span>
+              <button class="btn" id="toggleProgressAutoBtn" type="button">Pause</button>
+              <button class="btn primary" id="refreshProgressBtn" type="button">Refresh Progress</button>
+            </div>
+          </div>
+          <div class="grid gap-5 p-4 sm:p-5">
+            <div class="progress-flow">
+              <div class="flow-node" data-progress-step="opening">
+                <div class="mb-4 flex items-center justify-between gap-3"><span class="text-xs font-black uppercase tracking-wider text-slate-500">Open Page</span><span class="flow-dot"></span></div>
+                <strong class="text-xl font-black text-slate-950" id="progressStepPage">Page -</strong>
+                <p class="mt-2 text-sm font-semibold text-slate-500">Loading the next expired-domain page.</p>
+              </div>
+              <div class="flow-node" data-progress-step="copying">
+                <div class="mb-4 flex items-center justify-between gap-3"><span class="text-xs font-black uppercase tracking-wider text-slate-500">Copy</span><span class="flow-dot"></span></div>
+                <strong class="text-xl font-black text-slate-950">Domains</strong>
+                <p class="mt-2 text-sm font-semibold text-slate-500">Collecting domains from the listing.</p>
+              </div>
+              <div class="flow-node" data-progress-step="saving">
+                <div class="mb-4 flex items-center justify-between gap-3"><span class="text-xs font-black uppercase tracking-wider text-slate-500">Save</span><span class="flow-dot"></span></div>
+                <strong class="text-xl font-black text-slate-950" id="progressStepExported">- rows</strong>
+                <p class="mt-2 text-sm font-semibold text-slate-500">Writing export rows and MongoDB records.</p>
+              </div>
+              <div class="flow-node" data-progress-step="wsc">
+                <div class="mb-4 flex items-center justify-between gap-3"><span class="text-xs font-black uppercase tracking-wider text-slate-500">SEO Check</span><span class="flow-dot"></span></div>
+                <strong class="text-xl font-black text-slate-950" id="progressStepWsc">- / -</strong>
+                <p class="mt-2 text-sm font-semibold text-slate-500">Submitting to Website SEO Checker.</p>
+              </div>
+              <div class="flow-node" data-progress-step="nawala">
+                <div class="mb-4 flex items-center justify-between gap-3"><span class="text-xs font-black uppercase tracking-wider text-slate-500">Nawala</span><span class="flow-dot"></span></div>
+                <strong class="text-xl font-black text-slate-950" id="progressStepNawala">-</strong>
+                <p class="mt-2 text-sm font-semibold text-slate-500">Checking URL block status.</p>
+              </div>
+              <div class="flow-node" data-progress-step="waiting">
+                <div class="mb-4 flex items-center justify-between gap-3"><span class="text-xs font-black uppercase tracking-wider text-slate-500">Wait</span><span class="flow-dot"></span></div>
+                <strong class="text-xl font-black text-slate-950" id="progressStepNext">-</strong>
+                <p class="mt-2 text-sm font-semibold text-slate-500">Countdown to the next cycle.</p>
+              </div>
+            </div>
+
+            <div class="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)_360px]">
+              <div class="setting-card place-items-center text-center">
+                <div class="progress-orb" id="progressCountdownOrb"><span class="text-2xl font-black text-slate-950" id="progressCountdownPercent">0%</span></div>
+                <div>
+                  <h3 class="mt-2 font-black text-slate-950">Cycle Countdown</h3>
+                  <p class="mt-1 text-sm font-semibold text-slate-500" id="progressCountdownLabel">Waiting for status.</p>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <h3 class="font-black text-slate-950">Cycle Movement</h3>
+                <div class="grid gap-4">
+                  <div>
+                    <div class="mb-2 flex justify-between text-sm font-bold text-slate-600"><span>Exported rows</span><span id="progressExportPercent">-</span></div>
+                    <div class="progress-track"><div class="progress-fill success" id="progressExportBar"></div></div>
+                  </div>
+                  <div>
+                    <div class="mb-2 flex justify-between text-sm font-bold text-slate-600"><span>Website SEO Checker</span><span id="progressWscPercent">-</span></div>
+                    <div class="progress-track"><div class="progress-fill" id="progressWscBar"></div></div>
+                  </div>
+                  <div>
+                    <div class="mb-2 flex justify-between text-sm font-bold text-slate-600"><span>Nawala Check</span><span id="progressNawalaPercent">-</span></div>
+                    <div class="progress-track"><div class="progress-fill" id="progressNawalaBar"></div></div>
+                  </div>
+                  <div class="rounded-lg bg-slate-50 p-3">
+                    <div class="text-xs font-black uppercase tracking-wider text-slate-500">Current Target</div>
+                    <p class="mono mt-2 break-all text-sm text-slate-700" id="progressUrl">-</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <h3 class="font-black text-slate-950">Website SEO Checker</h3>
+                <div class="grid gap-2 text-sm font-semibold text-slate-600">
+                  <div class="flex justify-between gap-3"><span>Batch</span><span id="progressWscBatch">-</span></div>
+                  <div class="flex justify-between gap-3"><span>Submitted</span><span id="progressWscSubmitted">-</span></div>
+                  <div class="flex justify-between gap-3"><span>Saved</span><span id="progressWscSaved">-</span></div>
+                  <div class="flex justify-between gap-3"><span>Errors</span><span id="progressWscErrors">-</span></div>
+                </div>
+                <div class="border-t border-slate-200 pt-4">
+                  <h3 class="font-black text-slate-950">Nawala Check</h3>
+                  <div class="grid gap-2 text-sm font-semibold text-slate-600">
+                    <div class="flex justify-between gap-3"><span>Submitted</span><span id="progressNawalaSubmitted">-</span></div>
+                    <div class="flex justify-between gap-3"><span>Final saved</span><span id="progressNawalaSaved">-</span></div>
+                    <div class="flex justify-between gap-3"><span>Total URLs</span><span id="progressNawalaTotal">-</span></div>
+                    <div class="flex justify-between gap-3"><span>Blocked</span><span id="progressNawalaBlocked">-</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="content hidden mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-5 sm:px-6 lg:px-7" id="settingsTab">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Scraping Settings</h2>
+              <p class="mt-1 text-sm font-medium text-slate-500">Control how long the scraper waits between each run.</p>
+            </div>
+            <span class="status-pill" id="settingsRestartLabel">Restart status: -</span>
+          </div>
+          <div class="grid gap-5 p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div class="setting-card">
+              <div>
+                <h3 class="text-lg font-black text-slate-950">Scrape Time Duration</h3>
+                <p class="mt-1 text-sm font-medium text-slate-500">Set the delay before the scraper starts the next cycle. Minimum is 1 minute, maximum is 24 hours.</p>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                  Hours
+                  <input id="scrapeDurationHours" type="number" min="0" max="24" step="1" placeholder="0">
+                </label>
+                <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                  Minutes
+                  <input id="scrapeDurationMinutes" type="number" min="0" max="59" step="1" placeholder="45">
+                </label>
+                <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                  Seconds
+                  <input id="scrapeDurationSeconds" type="number" min="0" max="59" step="1" placeholder="0">
+                </label>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button class="btn duration-preset" type="button" data-seconds="60">1 min</button>
+                <button class="btn duration-preset" type="button" data-seconds="1800">30 min</button>
+                <button class="btn duration-preset" type="button" data-seconds="2700">45 min</button>
+                <button class="btn duration-preset" type="button" data-seconds="3600">1 hour</button>
+                <button class="btn duration-preset" type="button" data-seconds="7200">2 hours</button>
+              </div>
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <button class="btn primary" id="saveSettingsScrapeIntervalBtn" type="button">Save Scrape Duration</button>
+                <button class="btn success" id="saveAndRestartScraperBtn" type="button">Save & Restart</button>
+                <span class="text-sm font-semibold text-slate-500" id="settingsDurationHint">Current: -</span>
+              </div>
+            </div>
+            <aside class="setting-card-dark">
+              <div>
+                <div class="text-xs font-black uppercase tracking-wider text-slate-400">Saved Schedule</div>
+                <div class="mt-3 text-4xl font-black" id="settingsDurationDisplay">-</div>
+                <p class="mt-2 text-sm font-medium text-slate-300" id="settingsEffectiveDisplay">Effective running duration: -</p>
+              </div>
+              <div class="rounded-lg border border-white/10 bg-white/5 p-3 text-sm font-medium text-slate-300">
+                If the scraper is already running, saving changes the next launch configuration. Restart the scraper if the page says a restart is required.
+              </div>
+            </aside>
+          </div>
+          <div class="border-t border-slate-200/80 p-4 sm:p-5">
+            <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 class="text-lg font-black text-slate-950">Endpoint Parameters</h3>
+                <p class="mt-1 text-sm font-medium text-slate-500">Change defaults used by dashboard buttons that call parameterized endpoints.</p>
+              </div>
+              <button class="btn primary" id="saveEndpointParamsBtn" type="button">Save Endpoint Defaults</button>
+            </div>
+            <div class="grid gap-4 xl:grid-cols-2">
+              <div class="setting-card">
+                <div>
+                  <h4 class="font-black text-slate-950">SEO Check Job</h4>
+                  <p class="mt-1 text-sm font-medium text-slate-500">Used by Basic SEO -> Run SEO Check.</p>
+                </div>
+                <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                  Limit
+                  <input id="endpointSeoLimit" type="number" min="1" max="10000" value="2000">
+                </label>
+                <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                  Recheck days
+                  <input id="endpointSeoRecheckDays" type="number" min="0" max="3650" value="14">
+                </label>
+                <label class="flex items-center gap-2 text-sm font-bold text-slate-600">
+                  <input id="endpointSeoForce" type="checkbox" checked>
+                  Force recheck
+                </label>
+              </div>
+
+              <div class="setting-card">
+                <div>
+                  <h4 class="font-black text-slate-950">Website SEO Checker</h4>
+                  <p class="mt-1 text-sm font-medium text-slate-500">Used by SEO Results -> Check.</p>
+                </div>
+                <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                  Submit limit
+                  <input id="endpointWscLimit" type="number" min="1" max="50" value="50">
+                </label>
+                <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                  Recent results limit
+                  <input id="endpointRecentWscLimit" type="number" min="1" max="100" value="10">
+                </label>
+                <label class="flex items-center gap-2 text-sm font-bold text-slate-600">
+                  <input id="endpointWscForce" type="checkbox">
+                  Force recheck
+                </label>
+              </div>
+
+              <div class="setting-card">
+                <div>
+                  <h4 class="font-black text-slate-950">Nawala Check</h4>
+                  <p class="mt-1 text-sm font-medium text-slate-500">Used by Nawala -> Run Nawala.</p>
+                </div>
+                <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                  Run limit
+                  <input id="endpointNawalaLimit" type="number" min="1" max="5000" value="1500">
+                </label>
+                <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                  Default log lines
+                  <input id="endpointLogLines" type="number" min="1" max="1000" value="100">
+                </label>
+                <label class="flex items-center gap-2 text-sm font-bold text-slate-600">
+                  <input id="endpointNawalaForce" type="checkbox">
+                  Force recheck
+                </label>
+              </div>
+
+              <div class="setting-card xl:col-span-2">
+                <div>
+                  <h4 class="font-black text-slate-950">Domain Lists</h4>
+                  <p class="mt-1 text-sm font-medium text-slate-500">Used by Domain Lists and /api/domain-lists/ filters like X-TBL-Min, X-QBL-Min, X-QT-Min, X-SS-Min, and X-Last-Hours.</p>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    Limit
+                    <input id="endpointDomainListsLimit" type="number" min="1" max="5000" value="1000">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    X-Last-Hours
+                    <input id="endpointDomainListsLastHours" type="number" min="0" max="8760" value="24">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    X-TBL-Min
+                    <input id="endpointDomainListsTblMin" type="number" min="0" value="0">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    X-TBL-Max
+                    <input id="endpointDomainListsTblMax" type="number" min="0" value="1000">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    X-QBL-Min
+                    <input id="endpointDomainListsQblMin" type="number" min="0" value="1">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    X-QBL-Max
+                    <input id="endpointDomainListsQblMax" type="number" min="0" value="1000">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    X-QT-Min
+                    <input id="endpointDomainListsQtMin" type="number" min="0" max="100" value="5">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    X-QT-Max
+                    <input id="endpointDomainListsQtMax" type="number" min="0" max="100" value="100">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    X-SS-Min
+                    <input id="endpointDomainListsSsMin" type="number" min="0" max="100" value="1">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    X-SS-Max
+                    <input id="endpointDomainListsSsMax" type="number" min="0" max="100" value="11">
+                  </label>
+                </div>
+              </div>
+            </div>
+            <p class="mt-4 text-sm font-semibold text-slate-500" id="endpointParamsStatus">Endpoint defaults are saved in this browser.</p>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    const API_KEY = {{ api_key_json|safe }};
+    const state = {
+      currentTab: "overview",
+      busy: false,
+      domainsPage: 1,
+      domainsTotal: 0,
+      domainsUniqueTotal: 0,
+      domainsLimit: 100,
+      duplicatesPage: 1,
+      duplicatesTotal: 0,
+      duplicatesLimit: 100,
+      wscPage: 1,
+      wscTotal: 0,
+      wscLimit: 100,
+      nawalaPage: 1,
+      nawalaTotal: 0,
+      nawalaFullTotal: 0,
+      nawalaLimit: 100,
+      domainListsPage: 1,
+      domainListsTotal: 0,
+      domainListsLimit: 1000,
+      progressAutoRefresh: true,
+      progressTimer: null,
+      countdownTimer: null,
+      countdown: {
+        waiting: false,
+        seconds: 0,
+        interval: 0,
+        receivedAt: 0,
+      },
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const text = (value) => value === null || value === undefined || value === "" ? "-" : String(value);
+    const wscDomain = (row) => row.submitted_domain || row.URL || row.domain;
+    const WSC_DEFAULT_FILTERS = {
+      wscTblMin: "0",
+      wscTblMax: "1000",
+      wscQblMin: "10",
+      wscQblMax: "1000",
+      wscQtMin: "5",
+      wscQtMax: "100",
+      wscSsMin: "1",
+      wscSsMax: "11",
+    };
+    const fmtDate = (value) => {
+      if (!value) return "-";
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+    };
+    const esc = (value) => text(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    function addClasses(selector, classes) {
+      document.querySelectorAll(selector).forEach((node) => node.classList.add(...classes));
+    }
+
+    function applyTailwindSkin() {
+      addClasses(".nav button", [
+        "min-h-11", "rounded-lg", "px-3", "py-2.5", "text-left", "text-sm", "font-semibold",
+        "text-slate-300", "transition", "hover:bg-white/10", "hover:text-white", "lg:w-full",
+        "focus:outline-none", "focus:ring-2", "focus:ring-sky-300/40",
+      ]);
+      addClasses(".btn", [
+        "inline-flex", "min-h-10", "items-center", "justify-center", "gap-2", "whitespace-nowrap",
+        "rounded-lg", "border", "border-slate-300/80", "bg-white", "px-3.5", "py-2", "text-sm",
+        "font-semibold", "text-slate-800", "shadow-sm", "transition", "hover:border-slate-400", "hover:bg-slate-50",
+        "focus:outline-none", "focus:ring-2", "focus:ring-sky-100", "disabled:cursor-wait", "disabled:opacity-60",
+      ]);
+      addClasses(".btn.primary", ["border-blue-700", "bg-blue-700", "text-white", "shadow-lift", "hover:bg-blue-800"]);
+      addClasses(".btn.success", ["border-emerald-700", "bg-emerald-700", "text-white", "shadow-lift", "hover:bg-emerald-800"]);
+      addClasses(".btn.danger", ["border-red-600", "bg-red-600", "text-white", "hover:bg-red-700"]);
+      addClasses("input, select", [
+        "min-h-10", "w-full", "rounded-lg", "border", "border-slate-300/80", "bg-white", "px-3", "py-2",
+        "text-sm", "font-medium", "text-slate-950", "shadow-sm", "outline-none", "transition",
+        "placeholder:text-slate-400", "focus:border-sky-500", "focus:ring-2", "focus:ring-sky-100",
+        "sm:w-auto",
+      ]);
+      addClasses("input[type='checkbox']", ["h-4", "min-h-0", "w-4", "rounded", "p-0", "text-blue-700", "shadow-none", "sm:w-4"]);
+      addClasses(".panel", ["overflow-hidden", "rounded-xl", "border", "border-slate-200/80", "bg-white", "shadow-premium"]);
+      addClasses(".panel-head", ["flex", "min-h-16", "flex-col", "gap-3", "border-b", "border-slate-200/80", "bg-white", "p-4", "sm:p-5", "lg:flex-row", "lg:items-center", "lg:justify-between"]);
+      addClasses(".panel-head h2", ["text-base", "font-bold", "text-slate-950"]);
+      addClasses(".filters", ["flex", "w-full", "flex-col", "gap-2.5", "sm:flex-row", "sm:flex-wrap", "lg:w-auto", "lg:justify-end"]);
+      addClasses(".table-wrap", ["w-full", "overflow-x-auto"]);
+      addClasses("table", ["w-full", "min-w-[760px]", "border-collapse", "text-sm"]);
+      addClasses("th", ["bg-slate-50/90", "px-4", "py-3.5", "text-left", "text-xs", "font-black", "uppercase", "tracking-wider", "text-slate-500"]);
+      addClasses("td", ["border-t", "border-slate-200/80", "px-4", "py-3.5", "align-top", "text-sm", "text-slate-800"]);
+      addClasses(".stat", ["grid", "min-h-36", "content-between", "gap-3", "rounded-xl", "border", "border-slate-200/80", "bg-white", "p-5", "shadow-premium"]);
+      addClasses(".stat span", ["text-xs", "font-black", "uppercase", "tracking-wider", "text-slate-500"]);
+      addClasses(".stat strong", ["break-words", "text-3xl", "font-black", "leading-tight", "text-slate-950", "sm:text-4xl"]);
+      addClasses(".stat small", ["text-sm", "font-medium", "text-slate-500"]);
+      addClasses(".metric-badge", ["not-italic", "inline-grid", "h-9", "w-9", "place-items-center", "rounded-lg", "text-xs", "font-black"]);
+      addClasses(".setting-card", ["grid", "gap-5", "rounded-xl", "border", "border-slate-200/80", "bg-white", "p-5", "shadow-sm"]);
+      addClasses(".setting-card-dark", ["grid", "gap-5", "rounded-xl", "border", "border-slate-800", "bg-slate-950", "p-5", "text-white", "shadow-sm"]);
+      addClasses(".status-pill", ["inline-flex", "min-h-8", "items-center", "gap-2", "rounded-full", "border", "border-slate-200/80", "bg-slate-100", "px-3", "py-1", "text-sm", "font-bold", "text-slate-600"]);
+      addClasses(".pager", ["flex", "flex-col", "gap-3", "border-t", "border-slate-200/80", "bg-slate-50/70", "p-4", "sm:flex-row", "sm:items-center", "sm:justify-between"]);
+      addClasses(".pager-actions", ["flex", "flex-wrap", "items-center", "gap-2"]);
+      addClasses(".pager-info", ["text-sm", "font-medium", "text-slate-600"]);
+      addClasses(".empty", ["p-8", "text-center", "text-sm", "font-medium", "text-slate-500"]);
+      addClasses(".mono", ["font-mono", "text-[13px]"]);
+      $("logsOutput").classList.add("min-h-[320px]", "max-h-[68vh]", "overflow-auto", "whitespace-pre-wrap", "bg-slate-950", "p-5", "text-xs", "leading-6", "text-slate-100");
+      $("toast").classList.add("fixed", "bottom-4", "right-4", "z-30", "max-w-[min(420px,calc(100vw-32px))]", "rounded-xl", "border", "border-white/10", "bg-slate-950", "px-4", "py-3", "text-sm", "font-medium", "text-white", "shadow-premium");
+    }
+
+    const ENDPOINT_PARAM_DEFAULTS = {
+      endpointSeoLimit: "2000",
+      endpointSeoRecheckDays: "14",
+      endpointSeoForce: true,
+      endpointWscLimit: "50",
+      endpointRecentWscLimit: "10",
+      endpointWscForce: false,
+      endpointNawalaLimit: "1500",
+      endpointLogLines: "100",
+      endpointNawalaForce: false,
+      endpointDomainListsLimit: "1000",
+      endpointDomainListsLastHours: "24",
+      endpointDomainListsTblMin: "0",
+      endpointDomainListsTblMax: "1000",
+      endpointDomainListsQblMin: "1",
+      endpointDomainListsQblMax: "1000",
+      endpointDomainListsQtMin: "5",
+      endpointDomainListsQtMax: "100",
+      endpointDomainListsSsMin: "1",
+      endpointDomainListsSsMax: "11",
+    };
+
+    function endpointParamValue(id) {
+      const node = $(id);
+      if (!node) return ENDPOINT_PARAM_DEFAULTS[id];
+      return node.type === "checkbox" ? node.checked : node.value;
+    }
+
+    function setEndpointParamValue(id, value) {
+      const node = $(id);
+      if (!node) return;
+      if (node.type === "checkbox") {
+        node.checked = value === true || value === "true";
+      } else {
+        node.value = value ?? ENDPOINT_PARAM_DEFAULTS[id] ?? "";
+      }
+    }
+
+    function loadEndpointParameterSettings() {
+      let saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem("dashboardEndpointParameters") || "{}");
+      } catch (error) {
+        saved = {};
+      }
+      Object.entries(ENDPOINT_PARAM_DEFAULTS).forEach(([id, fallback]) => setEndpointParamValue(id, saved[id] ?? fallback));
+      if ($("nawalaRunLimit")) $("nawalaRunLimit").value = endpointParamValue("endpointNawalaLimit") || "1500";
+      if ($("logLines")) $("logLines").value = String(endpointParamValue("endpointLogLines") || "100");
+      syncDomainListsInputsFromEndpointSettings();
+    }
+
+    function saveEndpointParameterSettings() {
+      const values = {};
+      Object.keys(ENDPOINT_PARAM_DEFAULTS).forEach((id) => {
+        values[id] = endpointParamValue(id);
+      });
+      localStorage.setItem("dashboardEndpointParameters", JSON.stringify(values));
+      if ($("nawalaRunLimit")) $("nawalaRunLimit").value = values.endpointNawalaLimit || "1500";
+      if ($("logLines")) $("logLines").value = String(values.endpointLogLines || "100");
+      syncDomainListsInputsFromEndpointSettings();
+      $("endpointParamsStatus").textContent = "Endpoint defaults saved.";
+      toast("Endpoint defaults saved.");
+      return values;
+    }
+
+    function endpointNumber(id, fallback, minimum, maximum) {
+      const raw = Number(endpointParamValue(id) || fallback);
+      const parsed = Number.isFinite(raw) ? Math.floor(raw) : fallback;
+      return Math.max(minimum, Math.min(maximum, parsed));
+    }
+
+    function blockDomainTabOpening() {
+      document.addEventListener("click", (event) => {
+        const link = event.target.closest ? event.target.closest("a") : null;
+        if (!link) return;
+        const href = link.getAttribute("href") || "";
+        const isInternal = href.startsWith("/") || href.startsWith("#") || href.startsWith(window.location.origin);
+        if (!isInternal) {
+          event.preventDefault();
+          toast("Domain links are disabled in this dashboard.");
+        }
+      }, true);
+    }
+
+    function syncDomainListsInputsFromEndpointSettings() {
+      const pairs = [
+        ["domainListsLimit", "endpointDomainListsLimit"],
+        ["domainListsLastHours", "endpointDomainListsLastHours"],
+        ["domainListsTblMin", "endpointDomainListsTblMin"],
+        ["domainListsTblMax", "endpointDomainListsTblMax"],
+        ["domainListsQblMin", "endpointDomainListsQblMin"],
+        ["domainListsQblMax", "endpointDomainListsQblMax"],
+        ["domainListsQtMin", "endpointDomainListsQtMin"],
+        ["domainListsQtMax", "endpointDomainListsQtMax"],
+        ["domainListsSsMin", "endpointDomainListsSsMin"],
+        ["domainListsSsMax", "endpointDomainListsSsMax"],
+      ];
+      pairs.forEach(([targetId, sourceId]) => {
+        if ($(targetId)) $(targetId).value = endpointParamValue(sourceId) ?? "";
+      });
+    }
+
+    function syncActiveNav() {
+      document.querySelectorAll(".nav button").forEach((button) => {
+        const active = button.dataset.tab === state.currentTab;
+        button.classList.toggle("active", active);
+        button.classList.toggle("bg-white/10", active);
+        button.classList.toggle("text-white", active);
+      });
+    }
+
+    function mountProgressOnOverview() {
+      const progressTab = $("progressTab");
+      const overviewTab = $("overviewTab");
+      if (!progressTab || !overviewTab || progressTab.dataset.mounted === "true") return;
+      const marker = overviewTab.children[1] || null;
+      while (progressTab.firstElementChild) {
+        overviewTab.insertBefore(progressTab.firstElementChild, marker);
+      }
+      progressTab.dataset.mounted = "true";
+      progressTab.remove();
+    }
+
+    function toast(message) {
+      const node = $("toast");
+      node.textContent = message;
+      node.classList.remove("hidden");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => node.classList.add("hidden"), 3500);
+    }
+
+    async function api(path, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (API_KEY) headers["200m-API-Key"] = API_KEY;
+      const response = await fetch(path, { ...options, headers });
+      const type = response.headers.get("content-type") || "";
+      const body = type.includes("application/json") ? await response.json() : await response.text();
+      if (!response.ok) {
+        const detail = body && body.detail ? body.detail : response.statusText;
+        throw new Error(detail);
+      }
+      return body;
+    }
+
+    function downloadDatabaseBackup() {
+      $("dbBackupStatus").textContent = "Preparing...";
+      const link = document.createElement("a");
+      link.href = "/api/database/backup/";
+      link.download = "";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      $("dbBackupStatus").textContent = "Download started";
+      toast("Database backup download started.");
+    }
+
+    async function restoreDatabaseBackup() {
+      const file = $("dbRestoreFile").files[0];
+      if (!file) throw new Error("Choose a .gz backup file first.");
+      if (!window.confirm("Restore this backup? Existing collections in the backup will be replaced.")) return;
+      $("dbRestoreStatus").textContent = "Restoring...";
+      const form = new FormData();
+      form.append("backup", file);
+      const data = await api("/api/database/restore/", { method: "POST", body: form });
+      $("dbRestoreStatus").textContent = `Restored ${data.total_documents || 0} documents`;
+      toast(data.message || "Database restored.");
+      await refreshStatus();
+    }
+
+    function setBusy(busy) {
+      state.busy = busy;
+      ["startBtn", "restartBtn", "startFirstPageBtn", "stopBtn", "refreshBtn", "loadDomainsBtn", "loadSeoBtn", "runSeoBtn", "loadLogsBtn", "loadBatchesBtn", "loadRecentWscBtn", "prevDomainsBtn", "nextDomainsBtn", "clearDomainFiltersBtn", "loadDuplicatesBtn", "clearDuplicatesBtn", "prevDuplicatesBtn", "nextDuplicatesBtn", "runWscBtn", "loadWscBtn", "prevWscBtn", "nextWscBtn", "clearWscFiltersBtn", "runNawalaBtn", "loadNawalaBtn", "prevNawalaBtn", "nextNawalaBtn", "loadDomainListsBtn", "clearDomainListsBtn", "prevDomainListsBtn", "nextDomainListsBtn", "refreshProgressBtn", "downloadDbBackupBtn", "downloadDbBackupCardBtn", "restoreDbBackupBtn", "saveSettingsScrapeIntervalBtn", "saveAndRestartScraperBtn", "saveEndpointParamsBtn"].forEach((id) => {
+        const node = $(id);
+        if (node) node.disabled = busy;
+      });
+      updateDomainsPager();
+      updateDuplicatesPager();
+      updateWscPager();
+      updateNawalaPager();
+      updateDomainListsPager();
+    }
+
+    function renderStatus(data) {
+      const running = Boolean(data.running);
+      $("runDot").className = "dot " + (running ? "on" : "off");
+      $("runText").textContent = running ? `Running${data.pid ? " PID " + data.pid : ""}` : "Stopped";
+      $("dbDomains").textContent = text(data.db_domains);
+      $("uniqueDomains").textContent = text(data.without_duplicates || data.unique_domains);
+      $("seoRankChecks").textContent = text(data.seo_rank_checks);
+      $("nawalaCheckUrls").textContent = text(data.nawala_check_urls || data.nawala_checked_urls);
+      const live = data.live_status || {};
+      const cursor = data.page_cursor || {};
+      const pageLimit = Number(cursor.page_limit || 51);
+      $("startFirstPageBtn").classList.toggle("primary", Boolean(cursor.at_page_limit || Number(live.page || 0) >= pageLimit));
+      $("startFirstPageBtn").title = cursor.at_page_limit ? "Page limit reached. Reset cursor and start again from page 1." : "Reset cursor and start scraping from page 1.";
+      const isWaitingForNextRun = String(live.status || "").toLowerCase() === "sleeping" || String(live.phase || "").toLowerCase().includes("wait");
+      state.countdown = {
+        waiting: Boolean(isWaitingForNextRun && live.next_run_in_seconds !== undefined),
+        seconds: Math.max(0, Number(live.next_run_in_seconds || 0)),
+        interval: Math.max(0, Number(live.interval_seconds || 0)),
+        receivedAt: Date.now(),
+      };
+      $("exportedRows").textContent = text(live.exported_rows || live.last_exported_rows);
+      updateCountdownDisplays();
+      const rows = [
+        ["Script", data.script],
+        ["Log file", data.log],
+        ["Storage", "MongoDB"],
+        ["Unique domains", data.unique_domains],
+        ["Archived duplicates", data.duplicate_domains],
+        ["Duplicate collection", data.duplicate_collection],
+        ["SEO rank collection", data.wsc_collection],
+        ["Scrape interval", live.interval_seconds ? `${live.interval_seconds}s` : "-"],
+        ["Current page", live.page],
+        ["Next cursor page", cursor.next_page],
+        ["Page limit", cursor.page_limit ? `Page ${cursor.page_limit}` : "-"],
+        ["Last run started", fmtDate(live.last_run_started)],
+        ["Updated", fmtDate(live.updated_at)],
+        ["Return code", data.returncode],
+      ];
+      $("statusTable").innerHTML = rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td class="mono">${esc(v)}</td></tr>`).join("");
+    }
+
+    function renderLogs(lines) {
+      $("logsOutput").textContent = lines.length ? lines.join("\n") : "No log lines found.";
+    }
+
+    function renderProgress(data) {
+      const live = data.live_status || {};
+      const phase = String(live.phase || live.status || "").toLowerCase();
+      const isWaitingForNextRun = String(live.status || "").toLowerCase() === "sleeping" || phase.includes("wait");
+      const nextRun = Number(live.next_run_in_seconds || 0);
+      const interval = Number(live.interval_seconds || 0);
+      const countdownPercent = isWaitingForNextRun && interval > 0 ? Math.max(0, Math.min(100, Math.round(((interval - nextRun) / interval) * 100))) : 0;
+      const exported = Number(live.exported_rows || live.last_exported_rows || 0);
+      const exportedPercent = Math.max(0, Math.min(100, Math.round((exported / 200) * 100)));
+      const wscSubmitted = Number(live.wsc_submitted || 0);
+      const wscSaved = Number(live.wsc_saved || 0);
+      const wscPercent = wscSubmitted > 0 ? Math.max(0, Math.min(100, Math.round((wscSaved / wscSubmitted) * 100))) : 0;
+      const nawalaTotal = Number(data.nawala_check_urls || data.nawala_checked_urls || 0);
+      const nawalaSubmitted = Number(live.nawala_submitted || 0);
+      const nawalaSaved = Number(live.nawala_final_saved || live.nawala_saved || 0);
+      const nawalaPercent = nawalaSubmitted > 0 ? Math.max(0, Math.min(100, Math.round((nawalaSaved / nawalaSubmitted) * 100))) : 0;
+      $("progressPhase").textContent = text(live.phase || live.status);
+      $("progressStatus").textContent = `Status: ${text(live.status || (data.running ? "running" : "stopped"))}`;
+      $("progressPage").textContent = text(live.page);
+      $("progressBatch").textContent = `Batch: ${text(live.batch || live.last_batch)}`;
+      $("progressExported").textContent = text(exported || live.exported_rows || live.last_exported_rows);
+      $("progressLastRun").textContent = `Last run: ${text(live.last_run_started)}`;
+      $("progressNextRun").textContent = isWaitingForNextRun && live.next_run_in_seconds !== undefined ? formatDuration(Math.max(0, nextRun)) : "-";
+      $("progressUpdated").textContent = `Updated: ${fmtDate(live.updated_at)}`;
+      $("progressUrl").textContent = text(live.url);
+      $("progressWscBatch").textContent = live.wsc_batch || live.wsc_total_batches ? `${text(live.wsc_batch)} / ${text(live.wsc_total_batches)}` : "-";
+      $("progressWscSubmitted").textContent = text(live.wsc_submitted);
+      $("progressWscSaved").textContent = text(live.wsc_saved);
+      const errors = live.wsc_errors && live.wsc_errors.length ? live.wsc_errors.length : (live.wsc_error ? 1 : 0);
+      $("progressWscErrors").textContent = String(errors);
+      $("progressNawalaSubmitted").textContent = text(live.nawala_submitted);
+      $("progressNawalaSaved").textContent = text(live.nawala_final_saved || live.nawala_saved);
+      $("progressNawalaTotal").textContent = text(nawalaTotal);
+      $("progressNawalaBlocked").textContent = text(live.nawala_blocked);
+      $("progressStepPage").textContent = `Page ${text(live.page)}`;
+      $("progressStepExported").textContent = `${text(exported)} rows`;
+      $("progressStepWsc").textContent = live.wsc_batch || live.wsc_total_batches ? `${text(live.wsc_batch)} / ${text(live.wsc_total_batches)}` : "- / -";
+      $("progressStepNawala").textContent = nawalaSubmitted ? `${text(nawalaSaved)} / ${text(nawalaSubmitted)}` : text(nawalaTotal);
+      $("progressStepNext").textContent = isWaitingForNextRun && live.next_run_in_seconds !== undefined ? formatDuration(Math.max(0, nextRun)) : "-";
+      $("progressCountdownOrb").style.setProperty("--progress-angle", `${Math.round(countdownPercent * 3.6)}deg`);
+      $("progressCountdownPercent").textContent = `${countdownPercent}%`;
+      $("progressCountdownLabel").textContent = isWaitingForNextRun && live.next_run_in_seconds !== undefined ? `${formatDuration(Math.max(0, nextRun))} until next run` : "Waiting for next status update.";
+      $("progressExportBar").style.width = `${exportedPercent}%`;
+      $("progressExportPercent").textContent = `${exportedPercent}%`;
+      $("progressWscBar").style.width = `${wscPercent}%`;
+      $("progressWscPercent").textContent = wscSubmitted ? `${wscPercent}%` : "-";
+      $("progressNawalaBar").style.width = `${nawalaPercent}%`;
+      $("progressNawalaPercent").textContent = nawalaSubmitted ? `${nawalaPercent}%` : "-";
+      document.querySelectorAll("[data-progress-step]").forEach((node) => node.classList.remove("active"));
+      const activeStep = phase.includes("nawala") ? "nawala"
+        : phase.includes("wsc") || phase.includes("seo_checker") ? "wsc"
+        : phase.includes("wait") || phase.includes("sleep") ? "waiting"
+        : phase.includes("save") || phase.includes("export") ? "saving"
+        : phase.includes("copy") ? "copying"
+        : "opening";
+      const activeNode = document.querySelector(`[data-progress-step="${activeStep}"]`);
+      if (activeNode) activeNode.classList.add("active");
+      updateCountdownDisplays();
+    }
+
+    function formatDuration(seconds) {
+      const total = Math.max(0, Number(seconds || 0));
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const secs = total % 60;
+      const parts = [];
+      if (hours) parts.push(`${hours}h`);
+      if (minutes) parts.push(`${minutes}m`);
+      if (secs || !parts.length) parts.push(`${secs}s`);
+      return parts.join(" ");
+    }
+
+    function currentCountdownSeconds() {
+      if (!state.countdown.waiting) return 0;
+      const elapsed = Math.floor((Date.now() - state.countdown.receivedAt) / 1000);
+      return Math.max(0, Math.floor(state.countdown.seconds - elapsed));
+    }
+
+    function updateCountdownDisplays() {
+      const remaining = currentCountdownSeconds();
+      if (!state.countdown.waiting) {
+        $("nextRun").textContent = "Next run: -";
+        if ($("progressNextRun")) $("progressNextRun").textContent = "-";
+        if ($("progressStepNext")) $("progressStepNext").textContent = "-";
+        if ($("progressCountdownPercent")) $("progressCountdownPercent").textContent = "0%";
+        if ($("progressCountdownLabel")) $("progressCountdownLabel").textContent = "Waiting for next status update.";
+        if ($("progressCountdownOrb")) $("progressCountdownOrb").style.setProperty("--progress-angle", "0deg");
+        return;
+      }
+      const interval = Math.max(1, Number(state.countdown.interval || state.countdown.seconds || 1));
+      const percent = Math.max(0, Math.min(100, Math.round(((interval - remaining) / interval) * 100)));
+      $("nextRun").textContent = `Next run: ${formatDuration(remaining)}`;
+      if ($("progressNextRun")) $("progressNextRun").textContent = formatDuration(remaining);
+      if ($("progressStepNext")) $("progressStepNext").textContent = formatDuration(remaining);
+      if ($("progressCountdownPercent")) $("progressCountdownPercent").textContent = `${percent}%`;
+      if ($("progressCountdownLabel")) $("progressCountdownLabel").textContent = `${formatDuration(remaining)} until next run`;
+      if ($("progressCountdownOrb")) $("progressCountdownOrb").style.setProperty("--progress-angle", `${Math.round(percent * 3.6)}deg`);
+    }
+
+    function setScrapeDurationFields(seconds) {
+      const total = Math.max(0, Number(seconds || 0));
+      $("scrapeDurationHours").value = Math.floor(total / 3600);
+      $("scrapeDurationMinutes").value = Math.floor((total % 3600) / 60);
+      $("scrapeDurationSeconds").value = total % 60;
+      $("settingsDurationDisplay").textContent = total ? formatDuration(total) : "-";
+      $("settingsDurationHint").textContent = total ? `Current: ${formatDuration(total)} (${total}s)` : "Current: -";
+    }
+
+    function isEditingScrapeDuration() {
+      return ["scrapeDurationHours", "scrapeDurationMinutes", "scrapeDurationSeconds"].some((id) => document.activeElement === $(id));
+    }
+
+    function readSettingsDurationSeconds() {
+      const hours = Number($("scrapeDurationHours").value || 0);
+      const minutes = Number($("scrapeDurationMinutes").value || 0);
+      const seconds = Number($("scrapeDurationSeconds").value || 0);
+      return Math.max(0, Math.floor((hours * 3600) + (minutes * 60) + seconds));
+    }
+
+    function renderScraperSettings(data) {
+      setScrapeDurationFields(data.scrape_interval_seconds || "");
+      const effective = data.effective_current_run_seconds;
+      $("settingsEffectiveDisplay").textContent = effective ? `Effective running duration: ${formatDuration(effective)} (${effective}s)` : "Effective running duration: -";
+      $("settingsRestartLabel").textContent = data.restart_required ? "Restart required" : "Restart status: current";
+      $("settingsRestartLabel").classList.toggle("bg-amber-100", Boolean(data.restart_required));
+      $("settingsRestartLabel").classList.toggle("text-amber-800", Boolean(data.restart_required));
+    }
+
+    function previewSettingsDuration() {
+      const seconds = readSettingsDurationSeconds();
+      $("settingsDurationDisplay").textContent = seconds ? formatDuration(seconds) : "-";
+      $("settingsDurationHint").textContent = seconds ? `Selected: ${formatDuration(seconds)} (${seconds}s)` : "Selected: -";
+    }
+
+    async function refreshStatus() {
+      const data = await api("/api/main/logs/?lines=80");
+      renderStatus(data);
+      if (state.currentTab === "logs") renderLogs(data.logs || []);
+      if (state.currentTab === "overview") renderProgress(data);
+    }
+
+    async function loadScraperSettings() {
+      const data = await api("/api/scraper/settings/");
+      renderScraperSettings(data);
+      return data;
+    }
+
+    async function saveScrapeInterval() {
+      const seconds = Number(readSettingsDurationSeconds() || 0);
+      const data = await api("/api/scraper/interval/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seconds }),
+      });
+      renderScraperSettings(data);
+      toast(data.message || "Scrape interval saved.");
+      await loadScraperSettings();
+      return data;
+    }
+
+    async function saveSettingsScrapeInterval() {
+      return saveScrapeInterval();
+    }
+
+    async function saveAndRestartScraper() {
+      const saved = await saveScrapeInterval();
+      await api("/api/main/restart/", { method: "POST" });
+      toast("Scrape duration saved and scraper restarted.");
+      await refreshStatus();
+      await loadScraperSettings();
+      return saved;
+    }
+
+    async function startScraper() {
+      await api("/api/main/start/", { method: "POST" });
+      toast("Scraper started.");
+      await refreshStatus();
+    }
+
+    async function stopScraper() {
+      await api("/api/main/stop/", { method: "POST" });
+      toast("Scraper stopped.");
+      await refreshStatus();
+    }
+
+    async function restartScraper() {
+      await api("/api/main/restart/", { method: "POST" });
+      toast("Scraper started again.");
+      await refreshStatus();
+    }
+
+    async function startScraperFromFirstPage() {
+      await api("/api/scraper/start-page-1/", { method: "POST" });
+      toast("Cursor reset. Scraper started from page 1.");
+      await refreshStatus();
+      await loadScraperSettings();
+    }
+
+    async function loadBatches() {
+      const data = await api("/api/batches/");
+      const rows = data.items || [];
+      $("batchesBody").innerHTML = rows.length
+        ? rows.map((row) => `<tr><td>${esc(row.batch)}</td><td>${esc(row.count)}</td><td>${esc(fmtDate(row.exported_at))}</td></tr>`).join("")
+        : `<tr><td colspan="3" class="empty">No batches found.</td></tr>`;
+    }
+
+    async function loadRecentWsc() {
+      const limit = endpointNumber("endpointRecentWscLimit", 10, 1, 100);
+      const data = await api(`/api/wsc/results/?limit=${encodeURIComponent(limit)}`);
+      const rows = data.items || [];
+      $("recentWscBody").innerHTML = rows.length
+        ? rows.map((row) => `<tr><td class="mono" title="${esc(wscDomain(row))}">${esc(wscDomain(row))}</td><td>${esc(row.Title)}</td><td>${esc(row.DA)}</td><td>${esc(row.PA)}</td><td>${esc(row.TBL)}</td><td>${esc(row.QBL)}</td><td>${esc(row["Q/T"])}</td><td>${esc(row.OS)}</td><td>${esc(row.MT)}</td><td>${esc(row.SS)}</td><td>${esc(row.DH)}</td><td>${esc(row.nawala_status)}</td><td>${esc(row.nawala_blocked)}</td><td>${esc(fmtDate(row.checked_at))}</td></tr>`).join("")
+        : `<tr><td colspan="14" class="empty">No SEO rank checks found.</td></tr>`;
+    }
+
+    function updateDomainsPager() {
+      const total = state.domainsTotal || 0;
+      const limit = Number(state.domainsLimit || $("domainLimit").value || 100);
+      const pageCount = Math.max(1, Math.ceil(total / limit));
+      const page = Math.min(state.domainsPage, pageCount);
+      const start = total ? ((page - 1) * limit) + 1 : 0;
+      const end = total ? Math.min(page * limit, total) : 0;
+      $("domainsPagerInfo").textContent = total ? `Showing ${start}-${end} of ${total}` : "No rows loaded.";
+      $("domainsUniqueLabel").textContent = state.domainsUniqueTotal ? `Without duplicates: ${state.domainsUniqueTotal}` : "Without duplicates: -";
+      $("domainsPageLabel").textContent = total ? `Page ${page} of ${pageCount}` : "Page -";
+      $("prevDomainsBtn").disabled = state.busy || page <= 1;
+      $("nextDomainsBtn").disabled = state.busy || page >= pageCount || total === 0;
+    }
+
+    async function loadDomains(page = state.domainsPage) {
+      state.domainsLimit = Number($("domainLimit").value);
+      state.domainsPage = Math.max(1, page);
+      const skip = (state.domainsPage - 1) * state.domainsLimit;
+      const params = new URLSearchParams({ limit: String(state.domainsLimit), skip: String(skip) });
+      if ($("batchInput").value) params.set("batch", $("batchInput").value);
+      if ($("dateFromInput").value) params.set("date_from", $("dateFromInput").value);
+      if ($("dateToInput").value) params.set("date_to", $("dateToInput").value);
+      const data = await api(`/api/domains/?${params}`);
+      const rows = data.items || [];
+      state.domainsTotal = data.total || 0;
+      state.domainsUniqueTotal = data.without_duplicates || data.unique_total || 0;
+      if (state.domainsTotal && skip >= state.domainsTotal) {
+        return loadDomains(1);
+      }
+      $("domainsBody").innerHTML = rows.length
+        ? rows.map((row) => {
+            const rowData = row.data ? Object.entries(row.data).slice(0, 8).map(([k, v]) => `${k}: ${v}`).join(", ") : "";
+            return `<tr><td class="mono">${esc(row.domain)}</td><td>${esc(row.batch)}</td><td>${esc(fmtDate(row.exported_at))}</td><td>${esc(rowData)}</td></tr>`;
+          }).join("")
+        : `<tr><td colspan="4" class="empty">No domains found.</td></tr>`;
+      updateDomainsPager();
+    }
+
+    function resetAndLoadDomains() {
+      return loadDomains(1);
+    }
+
+    function clearDomainFilters() {
+      $("batchInput").value = "";
+      $("dateFromInput").value = "";
+      $("dateToInput").value = "";
+      state.domainsPage = 1;
+      return loadDomains(1);
+    }
+
+    function updateDuplicatesPager() {
+      const total = state.duplicatesTotal || 0;
+      const limit = Number(state.duplicatesLimit || $("duplicateLimit").value || 100);
+      const pageCount = Math.max(1, Math.ceil(total / limit));
+      const page = Math.min(state.duplicatesPage, pageCount);
+      const start = total ? ((page - 1) * limit) + 1 : 0;
+      const end = total ? Math.min(page * limit, total) : 0;
+      $("duplicatesPagerInfo").textContent = total ? `Showing ${start}-${end} of ${total}` : "No rows loaded.";
+      $("duplicatesPageLabel").textContent = total ? `Page ${page} of ${pageCount}` : "Page -";
+      $("prevDuplicatesBtn").disabled = state.busy || page <= 1;
+      $("nextDuplicatesBtn").disabled = state.busy || page >= pageCount || total === 0;
+    }
+
+    async function loadDuplicates(page = state.duplicatesPage) {
+      state.duplicatesLimit = Number($("duplicateLimit").value);
+      state.duplicatesPage = Math.max(1, page);
+      const skip = (state.duplicatesPage - 1) * state.duplicatesLimit;
+      const params = new URLSearchParams({ limit: String(state.duplicatesLimit), skip: String(skip) });
+      if ($("duplicateSearch").value) params.set("domain", $("duplicateSearch").value);
+      const data = await api(`/api/duplicates/?${params}`);
+      const rows = data.items || [];
+      state.duplicatesTotal = data.total || 0;
+      if (state.duplicatesTotal && skip >= state.duplicatesTotal) {
+        return loadDuplicates(1);
+      }
+      $("duplicatesBody").innerHTML = rows.length
+        ? rows.map((row) => `<tr><td class="mono">${esc(row.domain)}</td><td>${esc(row.batch)}</td><td>${esc(fmtDate(row.exported_at))}</td><td>${esc(fmtDate(row.moved_at))}</td><td>${esc(row.duplicate_reason)}</td></tr>`).join("")
+        : `<tr><td colspan="5" class="empty">No duplicate domains found.</td></tr>`;
+      updateDuplicatesPager();
+    }
+
+    function resetAndLoadDuplicates() {
+      return loadDuplicates(1);
+    }
+
+    function clearDuplicateFilters() {
+      $("duplicateSearch").value = "";
+      state.duplicatesPage = 1;
+      return loadDuplicates(1);
+    }
+
+    function updateWscPager() {
+      const total = state.wscTotal || 0;
+      const limit = Number(state.wscLimit || $("wscLimit").value || 100);
+      const pageCount = Math.max(1, Math.ceil(total / limit));
+      const page = Math.min(state.wscPage, pageCount);
+      const start = total ? ((page - 1) * limit) + 1 : 0;
+      const end = total ? Math.min(page * limit, total) : 0;
+      $("wscPagerInfo").textContent = total ? `Showing ${start}-${end} of ${total}` : "No rows loaded.";
+      $("wscPageLabel").textContent = total ? `Page ${page} of ${pageCount}` : "Page -";
+      $("prevWscBtn").disabled = state.busy || page <= 1;
+      $("nextWscBtn").disabled = state.busy || page >= pageCount || total === 0;
+    }
+
+    async function loadWsc(page = state.wscPage) {
+      state.wscLimit = Number($("wscLimit").value);
+      state.wscPage = Math.max(1, page);
+      const skip = (state.wscPage - 1) * state.wscLimit;
+      const params = new URLSearchParams({ limit: String(state.wscLimit), skip: String(skip) });
+      if ($("wscSearch").value) params.set("domain", $("wscSearch").value);
+      [
+        ["wscDaMin", "da_min"],
+        ["wscDaMax", "da_max"],
+        ["wscPaMin", "pa_min"],
+        ["wscPaMax", "pa_max"],
+        ["wscTblMin", "tbl_min"],
+        ["wscTblMax", "tbl_max"],
+        ["wscQblMin", "qbl_min"],
+        ["wscQblMax", "qbl_max"],
+        ["wscQtMin", "qt_min"],
+        ["wscQtMax", "qt_max"],
+        ["wscOsMin", "os_min"],
+        ["wscOsMax", "os_max"],
+        ["wscSsMin", "ss_min"],
+        ["wscSsMax", "ss_max"],
+      ].forEach(([inputId, param]) => {
+        if ($(inputId).value) params.set(param, $(inputId).value);
+      });
+      const data = await api(`/api/wsc/results/?${params}`);
+      const rows = data.items || [];
+      state.wscTotal = data.total || 0;
+      $("wscBody").innerHTML = rows.length
+        ? rows.map((row) => `<tr><td class="mono" title="${esc(wscDomain(row))}">${esc(wscDomain(row))}</td><td>${esc(row.Title)}</td><td>${esc(row.DA)}</td><td>${esc(row.PA)}</td><td>${esc(row.TBL)}</td><td>${esc(row.QBL)}</td><td>${esc(row["Q/T"])}</td><td>${esc(row.OS)}</td><td>${esc(row.MT)}</td><td>${esc(row.SS)}</td><td>${esc(row.DH)}</td><td>${esc(row.nawala_status)}</td><td>${esc(row.nawala_blocked)}</td><td>${esc(fmtDate(row.checked_at))}</td></tr>`).join("")
+        : `<tr><td colspan="14" class="empty">No Website SEO Checker results found.</td></tr>`;
+      updateWscPager();
+    }
+
+    function clearWscFilters() {
+      [
+        "wscSearch",
+        "wscDaMin",
+        "wscDaMax",
+        "wscPaMin",
+        "wscPaMax",
+        "wscTblMin",
+        "wscTblMax",
+        "wscQblMin",
+        "wscQblMax",
+        "wscQtMin",
+        "wscQtMax",
+        "wscOsMin",
+        "wscOsMax",
+        "wscSsMin",
+        "wscSsMax",
+      ].forEach((id) => {
+        $(id).value = WSC_DEFAULT_FILTERS[id] || "";
+      });
+      state.wscPage = 1;
+      return loadWsc(1);
+    }
+
+    async function runWsc() {
+      const limit = endpointNumber("endpointWscLimit", 50, 1, 50);
+      const force = endpointParamValue("endpointWscForce") ? "true" : "false";
+      const job = await api(`/api/wsc/check/?limit=${encodeURIComponent(limit)}&force=${force}`, { method: "POST" });
+      toast(`Website SEO Checker queued: ${job.job_id}`);
+      pollWscJob(job.job_id);
+    }
+
+    async function pollWscJob(jobId) {
+      try {
+        const job = await api(`/api/wsc/jobs/${jobId}/`);
+        toast(job.message || `Website SEO Checker ${job.status}`);
+        if (job.status === "queued" || job.status === "running") {
+          setTimeout(() => pollWscJob(jobId), 5000);
+        } else {
+          await loadWsc(1);
+        }
+      } catch (error) {
+        toast(error.message);
+      }
+    }
+
+    function updateNawalaPager() {
+      const total = state.nawalaTotal || 0;
+      const limit = Number(state.nawalaLimit || $("nawalaLimit").value || 100);
+      const pageCount = Math.max(1, Math.ceil(total / limit));
+      const page = Math.min(state.nawalaPage, pageCount);
+      const start = total ? ((page - 1) * limit) + 1 : 0;
+      const end = total ? Math.min(page * limit, total) : 0;
+      $("nawalaPagerInfo").textContent = total ? `Showing ${start}-${end} of ${total}` : "No rows loaded.";
+      $("nawalaPageLabel").textContent = total ? `Page ${page} of ${pageCount}` : "Page -";
+      $("prevNawalaBtn").disabled = state.busy || page <= 1;
+      $("nextNawalaBtn").disabled = state.busy || page >= pageCount || total === 0;
+    }
+
+    async function loadNawala(page = state.nawalaPage) {
+      state.nawalaLimit = Number($("nawalaLimit").value);
+      state.nawalaPage = Math.max(1, page);
+      const skip = (state.nawalaPage - 1) * state.nawalaLimit;
+      const params = new URLSearchParams({ limit: String(state.nawalaLimit), skip: String(skip) });
+      if ($("nawalaSearch").value) params.set("domain", $("nawalaSearch").value);
+      if ($("nawalaBlocked").value) params.set("blocked", $("nawalaBlocked").value);
+      if ($("nawalaSsMin").value) params.set("ss_min", $("nawalaSsMin").value);
+      if ($("nawalaSsMax").value) params.set("ss_max", $("nawalaSsMax").value);
+      const data = await api(`/api/nawala/results/?${params}`);
+      const rows = data.items || [];
+      state.nawalaTotal = data.total || 0;
+      state.nawalaFullTotal = data.full_total || 0;
+      $("nawalaTotalCount").textContent = `Filtered: ${state.nawalaTotal.toLocaleString()}`;
+      $("nawalaBody").innerHTML = rows.length
+        ? rows.map((row) => `<tr><td class="mono">${esc(row.domain)}</td><td>${esc(row.nawala_status)}</td><td>${esc(row.nawala_blocked)}</td><td>${esc(row.DA)}</td><td>${esc(row.PA)}</td><td>${esc(row.TBL)}</td><td>${esc(row.QBL)}</td><td>${esc(row["Q/T"])}</td><td>${esc(row.SS)}</td><td>${esc(row.Title)}</td><td>${esc(fmtDate(row.nawala_checked_at))}</td></tr>`).join("")
+        : `<tr><td colspan="11" class="empty">No Nawala results found.</td></tr>`;
+      updateNawalaPager();
+    }
+
+    async function runNawala() {
+      const limit = $("nawalaRunLimit").value || endpointNumber("endpointNawalaLimit", 1500, 1, 5000);
+      const force = endpointParamValue("endpointNawalaForce") ? "true" : "false";
+      const job = await api(`/api/nawala/check/?limit=${encodeURIComponent(limit)}&force=${force}`, { method: "POST" });
+      toast(`Nawala check queued: ${job.job_id}`);
+      pollNawalaJob(job.job_id);
+    }
+
+    async function pollNawalaJob(jobId) {
+      try {
+        const job = await api(`/api/nawala/jobs/${jobId}/`);
+        const detail = job.submitted !== undefined ? ` submitted=${job.submitted} blocked=${text(job.blocked)}` : "";
+        toast((job.message || `Nawala ${job.status}`) + detail);
+        if (job.status === "queued" || job.status === "running") {
+          setTimeout(() => pollNawalaJob(jobId), 3000);
+        } else {
+          await loadNawala(1);
+          await loadWsc(1);
+        }
+      } catch (error) {
+        toast(error.message);
+      }
+    }
+
+    function updateDomainListsPager() {
+      const total = state.domainListsTotal || 0;
+      const limit = Number(state.domainListsLimit || $("domainListsLimit").value || 1000);
+      const pageCount = Math.max(1, Math.ceil(total / limit));
+      const page = Math.min(state.domainListsPage, pageCount);
+      const start = total ? ((page - 1) * limit) + 1 : 0;
+      const end = total ? Math.min(page * limit, total) : 0;
+      const lastHours = $("domainListsLastHours").value || "0";
+      $("domainListsPagerInfo").textContent = total ? `Showing ${start}-${end} of ${total}` : "No rows loaded.";
+      $("domainListsPageLabel").textContent = total ? `Page ${page} of ${pageCount}` : "Page -";
+      $("domainListsFilterLabel").textContent = Number(lastHours) > 0 ? `Last ${lastHours} hours` : "Date filter disabled";
+      $("prevDomainListsBtn").disabled = state.busy || page <= 1;
+      $("nextDomainListsBtn").disabled = state.busy || page >= pageCount || total === 0;
+    }
+
+    async function loadDomainLists(page = state.domainListsPage) {
+      state.domainListsLimit = Number($("domainListsLimit").value || 1000);
+      state.domainListsPage = Math.max(1, page);
+      const skip = (state.domainListsPage - 1) * state.domainListsLimit;
+      const params = new URLSearchParams({ limit: String(state.domainListsLimit), skip: String(skip) });
+      [
+        ["domainListsTblMin", "tbl_min"],
+        ["domainListsTblMax", "tbl_max"],
+        ["domainListsQblMin", "qbl_min"],
+        ["domainListsQblMax", "qbl_max"],
+        ["domainListsQtMin", "qt_min"],
+        ["domainListsQtMax", "qt_max"],
+        ["domainListsSsMin", "ss_min"],
+        ["domainListsSsMax", "ss_max"],
+        ["domainListsLastHours", "last_hours"],
+      ].forEach(([inputId, param]) => {
+        if ($(inputId).value !== "") params.set(param, $(inputId).value);
+      });
+      const data = await api(`/api/domain-lists/?${params}`);
+      const rows = data.items || [];
+      state.domainListsTotal = data.total || 0;
+      if (state.domainListsTotal && skip >= state.domainListsTotal) {
+        return loadDomainLists(1);
+      }
+      $("domainListsBody").innerHTML = rows.length
+        ? rows.map((row) => `<tr><td class="mono">${esc(row.domain || row.URL)}</td><td>${esc(row.DA)}</td><td>${esc(row.PA)}</td><td>${esc(row.TBL)}</td><td>${esc(row.QBL)}</td><td>${esc(row["Q/T"])}</td><td>${esc(row.SS)}</td><td>${esc(row.Title)}</td><td>${esc(row.nawala_status)}</td><td>${esc(fmtDate(row.nawala_checked_at || row.checked_at))}</td></tr>`).join("")
+        : `<tr><td colspan="10" class="empty">No matching domains found.</td></tr>`;
+      updateDomainListsPager();
+    }
+
+    function resetAndLoadDomainLists() {
+      return loadDomainLists(1);
+    }
+
+    function clearDomainListsFilters() {
+      syncDomainListsInputsFromEndpointSettings();
+      state.domainListsPage = 1;
+      return loadDomainLists(1);
+    }
+
+    async function loadSeo() {
+      const params = new URLSearchParams({ limit: "100" });
+      if ($("seoSearch").value) params.set("domain", $("seoSearch").value);
+      if ($("minScore").value) params.set("min_score", $("minScore").value);
+      if ($("reachableFilter").value) params.set("reachable", $("reachableFilter").value);
+      const data = await api(`/api/seo/checks/?${params}`);
+      const rows = data.items || [];
+      $("seoBody").innerHTML = rows.length
+        ? rows.map((row) => `<tr><td class="mono">${esc(row.domain)}</td><td>${esc(row.seo_score)}</td><td>${esc(row.reachable)}</td><td>${esc(row.title)}</td><td>${esc(fmtDate(row.checked_at))}</td></tr>`).join("")
+        : `<tr><td colspan="5" class="empty">No SEO checks found.</td></tr>`;
+    }
+
+    async function runSeo() {
+      const limit = endpointNumber("endpointSeoLimit", 2000, 1, 10000);
+      const recheckDays = endpointNumber("endpointSeoRecheckDays", 14, 0, 3650);
+      const force = endpointParamValue("endpointSeoForce") ? "true" : "false";
+      const job = await api(`/api/seo/check/?limit=${encodeURIComponent(limit)}&force=${force}&recheck_days=${encodeURIComponent(recheckDays)}`, { method: "POST" });
+      toast(`SEO job queued: ${job.job_id}`);
+      pollSeoJob(job.job_id);
+    }
+
+    async function pollSeoJob(jobId) {
+      try {
+        const job = await api(`/api/seo/jobs/${jobId}/`);
+        toast(job.message || `SEO job ${job.status}`);
+        if (job.status === "queued" || job.status === "running") {
+          setTimeout(() => pollSeoJob(jobId), 3000);
+        } else {
+          await loadSeo();
+        }
+      } catch (error) {
+        toast(error.message);
+      }
+    }
+
+    async function loadLogs() {
+      const data = await api(`/api/main/logs/?lines=${$("logLines").value}`);
+      renderStatus(data);
+      renderLogs(data.logs || []);
+    }
+
+    async function loadProgress() {
+      const data = await api("/api/main/logs/?lines=1");
+      renderStatus(data);
+      renderProgress(data);
+    }
+
+    function updateProgressAutoUi() {
+      $("progressRefreshState").textContent = state.progressAutoRefresh ? "Auto refresh: on" : "Auto refresh: paused";
+      $("toggleProgressAutoBtn").textContent = state.progressAutoRefresh ? "Pause" : "Resume";
+    }
+
+    function scheduleProgressRefresh() {
+      clearInterval(state.progressTimer);
+      state.progressTimer = null;
+      if (state.currentTab === "overview" && state.progressAutoRefresh) {
+        state.progressTimer = setInterval(() => loadProgress().catch(() => {}), 3000);
+      }
+      updateProgressAutoUi();
+    }
+
+    function toggleProgressAutoRefresh() {
+      state.progressAutoRefresh = !state.progressAutoRefresh;
+      scheduleProgressRefresh();
+      if (state.progressAutoRefresh) return loadProgress();
+      return Promise.resolve();
+    }
+
+    async function guarded(fn) {
+      if (state.busy) return;
+      setBusy(true);
+      try {
+        await fn();
+      } catch (error) {
+        toast(error.message || "Something went wrong.");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function switchTab(tab) {
+      state.currentTab = tab;
+      syncActiveNav();
+      ["overview", "domains", "duplicates", "wsc", "nawala", "domainLists", "seo", "logs", "database", "settings"].forEach((name) => $(`${name}Tab`).classList.toggle("hidden", name !== tab));
+      const titles = {
+        overview: ["Overview", "Monitor the scraper and exported domains."],
+        domains: ["Domains", "Browse saved expired domains by batch."],
+        duplicates: ["Duplicates", "Browse archived duplicate domain records."],
+        wsc: ["SEO Results", "Browse saved Website SEO Checker result rows from MongoDB."],
+        nawala: ["Nawala", "Browse final SEO plus Nawala block-check results."],
+        domainLists: ["Domain Lists", "Filter export-ready domains with API-compatible parameters."],
+        seo: ["Basic SEO", "Run simple reachability checks and inspect SEO scoring."],
+        logs: ["Logs", "Read the latest scraper process output."],
+        database: ["Database", "Back up or restore MongoDB with gzip files."],
+        settings: ["Settings", "Tune scraper timing and runtime behavior."],
+      };
+      $("pageTitle").textContent = titles[tab][0];
+      $("pageSubtitle").textContent = titles[tab][1];
+      if (tab === "duplicates") guarded(loadDuplicates);
+      if (tab === "wsc") guarded(loadWsc);
+      if (tab === "nawala") guarded(loadNawala);
+      if (tab === "domainLists") guarded(loadDomainLists);
+      if (tab === "overview") guarded(loadProgress);
+      if (tab === "logs") guarded(loadLogs);
+      if (tab === "settings") guarded(loadScraperSettings);
+      scheduleProgressRefresh();
+    }
+
+    applyTailwindSkin();
+    mountProgressOnOverview();
+    loadEndpointParameterSettings();
+    blockDomainTabOpening();
+    syncActiveNav();
+    scheduleProgressRefresh();
+    document.querySelectorAll(".nav button").forEach((button) => button.addEventListener("click", () => switchTab(button.dataset.tab)));
+    $("startBtn").addEventListener("click", () => guarded(startScraper));
+    $("restartBtn").addEventListener("click", () => guarded(restartScraper));
+    $("startFirstPageBtn").addEventListener("click", () => guarded(startScraperFromFirstPage));
+    $("stopBtn").addEventListener("click", () => guarded(stopScraper));
+    $("refreshBtn").addEventListener("click", () => guarded(refreshStatus));
+    $("refreshProgressBtn").addEventListener("click", () => guarded(loadProgress));
+    $("toggleProgressAutoBtn").addEventListener("click", () => guarded(toggleProgressAutoRefresh));
+    $("downloadDbBackupBtn").addEventListener("click", () => guarded(downloadDatabaseBackup));
+    $("downloadDbBackupCardBtn").addEventListener("click", () => guarded(downloadDatabaseBackup));
+    $("restoreDbBackupBtn").addEventListener("click", () => guarded(restoreDatabaseBackup));
+    $("dbRestoreFile").addEventListener("change", () => {
+      const file = $("dbRestoreFile").files[0];
+      $("dbRestoreStatus").textContent = file ? file.name : "No file selected";
+    });
+    $("saveSettingsScrapeIntervalBtn").addEventListener("click", () => guarded(saveSettingsScrapeInterval));
+    $("saveAndRestartScraperBtn").addEventListener("click", () => guarded(saveAndRestartScraper));
+    $("saveEndpointParamsBtn").addEventListener("click", saveEndpointParameterSettings);
+    document.querySelectorAll(".duration-preset").forEach((button) => button.addEventListener("click", () => {
+      setScrapeDurationFields(Number(button.dataset.seconds || 0));
+    }));
+    ["scrapeDurationHours", "scrapeDurationMinutes", "scrapeDurationSeconds"].forEach((id) => {
+      $(id).addEventListener("input", previewSettingsDuration);
+    });
+    $("loadBatchesBtn").addEventListener("click", () => guarded(loadBatches));
+    $("loadRecentWscBtn").addEventListener("click", () => guarded(loadRecentWsc));
+    $("loadDomainsBtn").addEventListener("click", () => guarded(resetAndLoadDomains));
+    $("clearDomainFiltersBtn").addEventListener("click", () => guarded(clearDomainFilters));
+    $("prevDomainsBtn").addEventListener("click", () => guarded(() => loadDomains(state.domainsPage - 1)));
+    $("nextDomainsBtn").addEventListener("click", () => guarded(() => loadDomains(state.domainsPage + 1)));
+    $("domainLimit").addEventListener("change", () => guarded(resetAndLoadDomains));
+    $("dateFromInput").addEventListener("change", () => guarded(resetAndLoadDomains));
+    $("dateToInput").addEventListener("change", () => guarded(resetAndLoadDomains));
+    $("loadDuplicatesBtn").addEventListener("click", () => guarded(resetAndLoadDuplicates));
+    $("clearDuplicatesBtn").addEventListener("click", () => guarded(clearDuplicateFilters));
+    $("prevDuplicatesBtn").addEventListener("click", () => guarded(() => loadDuplicates(state.duplicatesPage - 1)));
+    $("nextDuplicatesBtn").addEventListener("click", () => guarded(() => loadDuplicates(state.duplicatesPage + 1)));
+    $("duplicateLimit").addEventListener("change", () => guarded(resetAndLoadDuplicates));
+    $("runWscBtn").addEventListener("click", () => guarded(runWsc));
+    $("loadWscBtn").addEventListener("click", () => guarded(() => loadWsc(1)));
+    $("clearWscFiltersBtn").addEventListener("click", () => guarded(clearWscFilters));
+    $("prevWscBtn").addEventListener("click", () => guarded(() => loadWsc(state.wscPage - 1)));
+    $("nextWscBtn").addEventListener("click", () => guarded(() => loadWsc(state.wscPage + 1)));
+    $("wscLimit").addEventListener("change", () => guarded(() => loadWsc(1)));
+    $("runNawalaBtn").addEventListener("click", () => guarded(runNawala));
+    $("loadNawalaBtn").addEventListener("click", () => guarded(() => loadNawala(1)));
+    $("prevNawalaBtn").addEventListener("click", () => guarded(() => loadNawala(state.nawalaPage - 1)));
+    $("nextNawalaBtn").addEventListener("click", () => guarded(() => loadNawala(state.nawalaPage + 1)));
+    $("nawalaLimit").addEventListener("change", () => guarded(() => loadNawala(1)));
+    $("nawalaBlocked").addEventListener("change", () => guarded(() => loadNawala(1)));
+    $("nawalaSsMin").addEventListener("change", () => guarded(() => loadNawala(1)));
+    $("nawalaSsMax").addEventListener("change", () => guarded(() => loadNawala(1)));
+    $("loadDomainListsBtn").addEventListener("click", () => guarded(resetAndLoadDomainLists));
+    $("clearDomainListsBtn").addEventListener("click", () => guarded(clearDomainListsFilters));
+    $("prevDomainListsBtn").addEventListener("click", () => guarded(() => loadDomainLists(state.domainListsPage - 1)));
+    $("nextDomainListsBtn").addEventListener("click", () => guarded(() => loadDomainLists(state.domainListsPage + 1)));
+    $("loadSeoBtn").addEventListener("click", () => guarded(loadSeo));
+    $("runSeoBtn").addEventListener("click", () => guarded(runSeo));
+    $("loadLogsBtn").addEventListener("click", () => guarded(loadLogs));
+
+    guarded(async () => {
+      await loadScraperSettings();
+      await refreshStatus();
+      await loadBatches();
+      await loadRecentWsc();
+    });
+    state.countdownTimer = setInterval(updateCountdownDisplays, 1000);
+    setInterval(() => refreshStatus().catch(() => {}), 10000);
+  </script>
+</body>
+</html>
