@@ -37,11 +37,34 @@ def openapi_schema() -> dict:
                     "type": "apiKey",
                     "in": "header",
                     "name": "200m-API-Key",
+                },
+                "XApiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-API-Key",
                 }
             }
         },
-        "security": [{"ApiKeyAuth": []}],
+        "security": [{"ApiKeyAuth": []}, {"XApiKeyAuth": []}],
         "paths": {
+            "/api/docs/": {
+                "get": {
+                    "tags": ["System"],
+                    "summary": "Render Swagger API documentation",
+                    "description": "Requires dashboard session login.",
+                    "security": [],
+                    "responses": {"200": {"description": "Swagger documentation page"}},
+                }
+            },
+            "/api/schema/": {
+                "get": {
+                    "tags": ["System"],
+                    "summary": "Return this OpenAPI schema",
+                    "description": "Requires dashboard session login.",
+                    "security": [],
+                    "responses": {"200": {"description": "OpenAPI schema JSON"}},
+                }
+            },
             "/api/health/": {
                 "get": {
                     "tags": ["System"],
@@ -124,6 +147,13 @@ def openapi_schema() -> dict:
                         parameter("seconds", "query", "integer", "Interval seconds, minimum 60"),
                         parameter("X-Scrape-Interval-Seconds", "header", "integer", "Interval seconds, minimum 60"),
                     ],
+                    "responses": JSON_RESPONSE,
+                }
+            },
+            "/api/scraper/start-page-1/": {
+                "post": {
+                    "tags": ["Scraper"],
+                    "summary": "Reset the scraper page cursor and start from page 1",
                     "responses": JSON_RESPONSE,
                 }
             },
@@ -276,12 +306,19 @@ def openapi_schema() -> dict:
                         parameter("os_max", "query", "integer", "Maximum OS percentage"),
                         parameter("ss_min", "query", "integer", "Minimum SS percentage"),
                         parameter("ss_max", "query", "integer", "Maximum SS percentage"),
+                        parameter("X-Domain", "header", "string", "Search by domain"),
+                        parameter("X-DA-Min", "header", "integer", "Minimum DA"),
+                        parameter("X-DA-Max", "header", "integer", "Maximum DA"),
+                        parameter("X-PA-Min", "header", "integer", "Minimum PA"),
+                        parameter("X-PA-Max", "header", "integer", "Maximum PA"),
                         parameter("X-TBL-Min", "header", "integer", "Minimum Moz Total Backlinks"),
                         parameter("X-TBL-Max", "header", "integer", "Maximum Moz Total Backlinks"),
                         parameter("X-QBL-Min", "header", "integer", "Minimum Moz Quality Backlinks"),
                         parameter("X-QBL-Max", "header", "integer", "Maximum Moz Quality Backlinks"),
                         parameter("X-QT-Min", "header", "integer", "Minimum quality backlinks percentage"),
                         parameter("X-QT-Max", "header", "integer", "Maximum quality backlinks percentage"),
+                        parameter("X-OS-Min", "header", "integer", "Minimum OS percentage"),
+                        parameter("X-OS-Max", "header", "integer", "Maximum OS percentage"),
                         parameter("X-SS-Min", "header", "integer", "Minimum SS percentage"),
                         parameter("X-SS-Max", "header", "integer", "Maximum SS percentage"),
                     ],
@@ -340,6 +377,13 @@ def openapi_schema() -> dict:
                         parameter("qt_max", "query", "integer", "Maximum quality backlinks percentage"),
                         parameter("ss_min", "query", "integer", "Minimum spam score percentage, default 1"),
                         parameter("ss_max", "query", "integer", "Maximum spam score percentage, default 1"),
+                        parameter("last_hours", "query", "integer", "Filter nawala_checked_at to the last N hours. Default 24. Use 0 to disable this and use date/time filters."),
+                        parameter("date_from", "query", "string", "Filter nawala_checked_at from date, YYYY-MM-DD"),
+                        parameter("date_to", "query", "string", "Filter nawala_checked_at to date, YYYY-MM-DD"),
+                        parameter("time_from", "query", "string", "Filter nawala_checked_at from time, HH:MM or HH:MM:SS"),
+                        parameter("time_to", "query", "string", "Filter nawala_checked_at to time, HH:MM or HH:MM:SS"),
+                        parameter("checked_from", "query", "string", "Filter nawala_checked_at from ISO datetime"),
+                        parameter("checked_to", "query", "string", "Filter nawala_checked_at to ISO datetime"),
                         parameter("X-TBL-Min", "header", "integer", "Minimum Moz Total Backlinks"),
                         parameter("X-TBL-Max", "header", "integer", "Maximum Moz Total Backlinks"),
                         parameter("X-QBL-Min", "header", "integer", "Minimum Moz Quality Backlinks"),

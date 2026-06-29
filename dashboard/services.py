@@ -909,9 +909,7 @@ def run_seo_job(job_id: str, limit: int, force: bool, recheck_days: int) -> None
     try:
         set_seo_job(job_id, status="running", started_at=datetime.utcnow(), message="SEO check running")
         config = load_seo_config()
-        config.force = force
-        config.recheck_days = recheck_days
-        domains = load_domains(config)[:limit]
+        domains = load_domains(config, limit, recheck_days, force_all=force)
         results = asyncio.run(run_checks_incremental(config, domains))
         save_results(config, results)
         ranked = rebuild_rankings(config)
