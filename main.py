@@ -34,6 +34,7 @@ DEFAULT_DOMAINS_PER_PAGE = 25
 DEFAULT_DAILY_PAGE_LIMIT = 51
 DEFAULT_CURSOR_CYCLE_SECONDS = 24 * 60 * 60
 MAIN_STATUS_FILE = Path(os.getenv("MAIN_STATUS_FILE", "main_status.json"))
+TELEGRAM_LAST_SIGNATURE = ""
 
 RAW_TLD_FILTERS = """
 .dk, .cl, .pt, .sk, .lt, .ro, *.jp, .*au, .no, .jp, *.jp, .hr, .nu, .au,
@@ -115,6 +116,7 @@ def update_main_status(**values: Any) -> None:
         current["next_run_in_seconds"] = None
     current["updated_at"] = datetime.now(timezone.utc).isoformat()
     MAIN_STATUS_FILE.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+    notify_telegram_status(current)
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -122,6 +124,146 @@ def env_bool(name: str, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def telegram_status_signature(status: dict[str, Any]) -> str:
+    keys = (
+        "status",
+        "phase",
+        "page",
+        "page_limit",
+        "batch",
+        "exported_rows",
+        "last_exported_rows",
+        "last_batch",
+        "wsc_batch",
+        "wsc_total_batches",
+        "wsc_submitted",
+        "wsc_saved",
+        "nawala_submitted",
+        "nawala_final_saved",
+        "nawala_blocked",
+        "next_run_in_seconds",
+        "error",
+    )
+    return "|".join(str(status.get(key, "")) for key in keys)
+
+
+def telegram_stage(status: dict[str, Any]) -> tuple[str, str]:
+    phase = str(status.get("phase") or "").lower()
+    current_status = str(status.get("status") or "").lower()
+    if "connect" in phase or "browser" in phase or phase == "started":
+        return "1/8", "Starting browser session"
+    if "opening_page" in phase or "starting_scrape" in phase:
+        return "2/8", "Opening expired-domains page"
+    if "filter" in phase:
+        return "3/8", "Applying site filters"
+    if "export" in phase or "copy" in phase:
+        return "4/8", "Exporting domains"
+    if "scrape_complete" in phase:
+        return "5/8", "Scrape cycle complete"
+    if "website_seo_checker" in phase:
+        return "6/8", "Website SEO Checker"
+    if "nawala" in phase:
+        return "7/8", "Nawala block check"
+    if "wait" in phase or current_status == "sleeping":
+        return "8/8", "Waiting for next run"
+    if current_status in {"error", "stopped", "complete"}:
+        return "Final", current_status.title()
+    return "-", str(status.get("phase") or current_status or "Unknown")
+
+
+def telegram_value(value: Any) -> str:
+    return "-" if value in {None, ""} else str(value)
+
+
+def telegram_short(value: Any, limit: int = 700) -> str:
+    text = telegram_value(value)
+    return text if len(text) <= limit else f"{text[:limit]}..."
+
+
+def telegram_status_message(status: dict[str, Any]) -> str:
+    stage_number, stage_name = telegram_stage(status)
+    exported = status.get("exported_rows", status.get("last_exported_rows"))
+    wsc_errors = status.get("wsc_errors")
+    wsc_error_count = len(wsc_errors) if isinstance(wsc_errors, list) else (1 if status.get("wsc_error") else 0)
+    lines = [
+        "Expired Domains live update",
+        f"Stage: {stage_number} - {stage_name}",
+        "",
+        "Run status",
+        f"- Status: {telegram_value(status.get('status'))}",
+        f"- Phase: {telegram_value(status.get('phase'))}",
+    ]
+    lines.extend(
+        [
+            "",
+            "Scrape progress",
+            f"- Page: {telegram_value(status.get('page'))} / {telegram_value(status.get('page_limit'))}",
+            f"- Batch: {telegram_value(status.get('batch', status.get('last_batch')))}",
+            f"- Exported rows: {telegram_value(exported)}",
+        ]
+    )
+    if status.get("wsc_batch") or status.get("wsc_submitted") or status.get("wsc_saved"):
+        lines.extend(
+            [
+                "",
+                "Website SEO Checker",
+                f"- Batch: {telegram_value(status.get('wsc_batch'))} / {telegram_value(status.get('wsc_total_batches'))}",
+                f"- Submitted: {telegram_value(status.get('wsc_submitted'))}",
+                f"- Saved: {telegram_value(status.get('wsc_saved'))}",
+                f"- Errors: {wsc_error_count}",
+            ]
+        )
+    if status.get("nawala_submitted") or status.get("nawala_final_saved") or status.get("nawala_saved"):
+        lines.extend(
+            [
+                "",
+                "Nawala check",
+                f"- Submitted: {telegram_value(status.get('nawala_submitted'))}",
+                f"- Saved: {telegram_value(status.get('nawala_final_saved', status.get('nawala_saved')))}",
+                f"- Blocked: {telegram_value(status.get('nawala_blocked'))}",
+                f"- Not blocked: {telegram_value(status.get('nawala_not_blocked'))}",
+            ]
+        )
+    lines.append("")
+    lines.append("Schedule")
+    lines.append(f"- Interval: {telegram_value(status.get('interval_seconds'))}s")
+    if status.get("next_run_in_seconds") not in {None, ""}:
+        lines.append(f"- Next run in: {status.get('next_run_in_seconds')}s")
+    lines.append(f"- Updated: {telegram_value(status.get('updated_at'))}")
+    if status.get("error"):
+        lines.extend(["", f"Error: {telegram_short(status.get('error'), 900)}"])
+    if status.get("url"):
+        lines.extend(["", f"Current URL: {telegram_short(status.get('url'), 900)}"])
+    message = "\n".join(lines)
+    return message if len(message) <= 3900 else f"{message[:3900]}\n..."
+
+
+def notify_telegram_status(status: dict[str, Any]) -> None:
+    global TELEGRAM_LAST_SIGNATURE
+    if not env_bool("TELEGRAM_NOTIFICATIONS_ENABLED", False):
+        return
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        return
+    phase = str(status.get("phase") or "").lower()
+    current_status = str(status.get("status") or "").lower()
+    notify_progress = env_bool("TELEGRAM_NOTIFY_PROGRESS", True)
+    if not notify_progress and current_status not in {"sleeping", "error", "stopped", "complete"} and "blocked" not in phase:
+        return
+    signature = telegram_status_signature(status)
+    if signature == TELEGRAM_LAST_SIGNATURE:
+        return
+    TELEGRAM_LAST_SIGNATURE = signature
+    body = urlencode({"chat_id": chat_id, "text": telegram_status_message(status), "disable_web_page_preview": "true"}).encode("utf-8")
+    request = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=body, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            response.read()
+    except Exception as exc:
+        print(f"Telegram notification failed: {exc}", file=sys.stderr, flush=True)
 
 
 def load_settings() -> Settings:

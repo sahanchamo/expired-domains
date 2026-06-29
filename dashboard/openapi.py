@@ -102,6 +102,17 @@ def openapi_schema() -> dict:
                     "responses": {**JSON_RESPONSE, "400": {"description": "Invalid or missing gzip backup"}},
                 }
             },
+            "/api/telegram/settings/": {
+                "get": {"tags": ["Telegram"], "summary": "Read Telegram notification settings", "responses": JSON_RESPONSE},
+                "post": {"tags": ["Telegram"], "summary": "Save Telegram notification settings", "responses": JSON_RESPONSE},
+            },
+            "/api/telegram/test/": {
+                "post": {
+                    "tags": ["Telegram"],
+                    "summary": "Send a Telegram test notification",
+                    "responses": {**JSON_RESPONSE, "400": {"description": "Telegram configuration or send failed"}},
+                }
+            },
             "/api/scraper/settings/": {
                 "get": {"tags": ["Scraper"], "summary": "Read editable scraper settings", "responses": JSON_RESPONSE}
             },

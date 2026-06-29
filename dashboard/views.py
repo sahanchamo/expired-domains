@@ -252,6 +252,34 @@ def scraper_interval(request: HttpRequest) -> JsonResponse:
 
 
 @csrf_exempt
+def telegram_settings(request: HttpRequest) -> JsonResponse:
+    error = require_api_key(request)
+    if error is not None:
+        return error
+    if request.method == "GET":
+        return JsonResponse(services.get_telegram_settings())
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+    except json.JSONDecodeError:
+        payload = {}
+    return JsonResponse(services.update_telegram_settings(payload))
+
+
+@csrf_exempt
+@require_POST
+def telegram_test(request: HttpRequest) -> JsonResponse:
+    error = require_api_key(request)
+    if error is not None:
+        return error
+    try:
+        return JsonResponse(services.test_telegram_notification())
+    except ValueError as exc:
+        return JsonResponse({"detail": str(exc)}, status=400)
+
+
+@csrf_exempt
 @require_POST
 def scraper_start_from_first_page(request: HttpRequest) -> JsonResponse:
     error = require_api_key(request)

@@ -7,6 +7,8 @@ import os
 import subprocess
 import sys
 import threading
+import urllib.parse
+import urllib.request
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -599,6 +601,156 @@ def update_scraper_interval(seconds: int) -> dict[str, Any]:
         else "Scrape interval saved."
     )
     return data
+
+
+def env_bool_value(name: str, default: bool = False) -> bool:
+    value = env_value(name, "true" if default else "false").lower()
+    return value in {"1", "true", "yes", "y", "on"}
+
+
+def mask_secret(value: str) -> str:
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "*" * len(value)
+    return f"{value[:4]}...{value[-4:]}"
+
+
+def get_telegram_settings() -> dict[str, Any]:
+    token = env_value("TELEGRAM_BOT_TOKEN", "")
+    chat_id = env_value("TELEGRAM_CHAT_ID", "")
+    return {
+        "enabled": env_bool_value("TELEGRAM_NOTIFICATIONS_ENABLED", False),
+        "bot_token_set": bool(token),
+        "bot_token_masked": mask_secret(token),
+        "chat_id": chat_id,
+        "notify_progress": env_bool_value("TELEGRAM_NOTIFY_PROGRESS", True),
+    }
+
+
+def update_telegram_settings(payload: dict[str, Any]) -> dict[str, Any]:
+    enabled = bool(payload.get("enabled"))
+    notify_progress = bool(payload.get("notify_progress", True))
+    chat_id = str(payload.get("chat_id") or "").strip()
+    token = str(payload.get("bot_token") or "").strip()
+    keep_existing_token = bool(payload.get("keep_existing_token"))
+
+    write_env_value("TELEGRAM_NOTIFICATIONS_ENABLED", "true" if enabled else "false")
+    write_env_value("TELEGRAM_NOTIFY_PROGRESS", "true" if notify_progress else "false")
+    write_env_value("TELEGRAM_CHAT_ID", chat_id)
+    if token or not keep_existing_token:
+        write_env_value("TELEGRAM_BOT_TOKEN", token)
+
+    data = get_telegram_settings()
+    data["saved"] = True
+    data["message"] = "Telegram settings saved."
+    return data
+
+
+def send_telegram_message(message: str) -> dict[str, Any]:
+    token = env_value("TELEGRAM_BOT_TOKEN", "")
+    chat_id = env_value("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        raise ValueError("Telegram bot token and chat ID are required.")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    body = urllib.parse.urlencode(
+        {
+            "chat_id": chat_id,
+            "text": message,
+            "disable_web_page_preview": "true",
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(url, data=body, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        raise ValueError(f"Telegram send failed: {exc}") from exc
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Telegram returned an invalid response.") from exc
+    if not data.get("ok"):
+        raise ValueError(str(data.get("description") or "Telegram send failed."))
+    return {"ok": True, "message": "Telegram message sent."}
+
+
+def telegram_value(value: Any) -> str:
+    return "-" if value in {None, ""} else str(value)
+
+
+def telegram_stage(status: dict[str, Any]) -> tuple[str, str]:
+    phase = str(status.get("phase") or "").lower()
+    current_status = str(status.get("status") or "").lower()
+    if "connect" in phase or "browser" in phase or phase == "started":
+        return "1/8", "Starting browser session"
+    if "opening_page" in phase or "starting_scrape" in phase:
+        return "2/8", "Opening expired-domains page"
+    if "filter" in phase:
+        return "3/8", "Applying site filters"
+    if "export" in phase or "copy" in phase:
+        return "4/8", "Exporting domains"
+    if "scrape_complete" in phase:
+        return "5/8", "Scrape cycle complete"
+    if "website_seo_checker" in phase:
+        return "6/8", "Website SEO Checker"
+    if "nawala" in phase:
+        return "7/8", "Nawala block check"
+    if "wait" in phase or current_status == "sleeping":
+        return "8/8", "Waiting for next run"
+    if current_status in {"error", "stopped", "complete"}:
+        return "Final", current_status.title()
+    return "-", str(status.get("phase") or current_status or "Unknown")
+
+
+def telegram_dashboard_message(live: dict[str, Any], counts: dict[str, Any]) -> str:
+    stage_number, stage_name = telegram_stage(live)
+    wsc_errors = live.get("wsc_errors")
+    wsc_error_count = len(wsc_errors) if isinstance(wsc_errors, list) else (1 if live.get("wsc_error") else 0)
+    return "\n".join(
+        [
+            "Expired Domains dashboard test",
+            f"Stage: {stage_number} - {stage_name}",
+            "",
+            "Run status",
+            f"- Status: {telegram_value(live.get('status'))}",
+            f"- Phase: {telegram_value(live.get('phase'))}",
+            "",
+            "Scrape progress",
+            f"- Page: {telegram_value(live.get('page'))}",
+            f"- Batch: {telegram_value(live.get('batch', live.get('last_batch')))}",
+            f"- Exported rows: {telegram_value(live.get('exported_rows', live.get('last_exported_rows')))}",
+            "",
+            "Database",
+            f"- Domains: {telegram_value(counts.get('db_domains'))}",
+            f"- Unique: {telegram_value(counts.get('unique_domains'))}",
+            f"- Duplicates: {telegram_value(counts.get('duplicate_domains'))}",
+            f"- SEO rank checks: {telegram_value(counts.get('seo_rank_checks'))}",
+            f"- Nawala URLs: {telegram_value(counts.get('nawala_check_urls'))}",
+            "",
+            "Website SEO Checker",
+            f"- Batch: {telegram_value(live.get('wsc_batch'))} / {telegram_value(live.get('wsc_total_batches'))}",
+            f"- Submitted: {telegram_value(live.get('wsc_submitted'))}",
+            f"- Saved: {telegram_value(live.get('wsc_saved'))}",
+            f"- Errors: {wsc_error_count}",
+            "",
+            "Nawala check",
+            f"- Submitted: {telegram_value(live.get('nawala_submitted'))}",
+            f"- Saved: {telegram_value(live.get('nawala_final_saved', live.get('nawala_saved')))}",
+            f"- Blocked: {telegram_value(live.get('nawala_blocked'))}",
+            "",
+            "Schedule",
+            f"- Interval: {telegram_value(live.get('interval_seconds'))}s",
+            f"- Next run in: {telegram_value(live.get('next_run_in_seconds'))}s",
+            f"- Updated: {telegram_value(live.get('updated_at'))}",
+        ]
+    )
+
+
+def test_telegram_notification() -> dict[str, Any]:
+    live = live_status_with_countdown()
+    message = telegram_dashboard_message(live, domain_counts())
+    return send_telegram_message(message)
 
 
 def start_main_process() -> dict[str, Any]:

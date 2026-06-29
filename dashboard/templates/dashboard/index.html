@@ -1160,6 +1160,52 @@
           <div class="border-t border-slate-200/80 p-4 sm:p-5">
             <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
+                <h3 class="text-lg font-black text-slate-950">Telegram Notifications</h3>
+                <p class="mt-1 text-sm font-medium text-slate-500">Send scraper status, page progress, errors, and next-run updates to a Telegram chat.</p>
+              </div>
+              <span class="status-pill" id="telegramStatusLabel">Telegram: -</span>
+            </div>
+            <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div class="setting-card">
+                <div class="grid gap-3 lg:grid-cols-2">
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    Bot token
+                    <input id="telegramBotToken" type="password" placeholder="123456:ABC...">
+                  </label>
+                  <label class="grid gap-1.5 text-sm font-bold text-slate-600">
+                    Chat ID
+                    <input id="telegramChatId" type="text" placeholder="-1001234567890">
+                  </label>
+                </div>
+                <div class="flex flex-wrap gap-4">
+                  <label class="flex items-center gap-2 text-sm font-bold text-slate-600">
+                    <input id="telegramEnabled" type="checkbox">
+                    Enable Telegram
+                  </label>
+                  <label class="flex items-center gap-2 text-sm font-bold text-slate-600">
+                    <input id="telegramNotifyProgress" type="checkbox" checked>
+                    Send progress updates
+                  </label>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button class="btn primary" id="saveTelegramSettingsBtn" type="button">Save Telegram</button>
+                  <button class="btn success" id="testTelegramBtn" type="button">Send Test</button>
+                  <span class="text-sm font-semibold text-slate-500" id="telegramHint">Token: -</span>
+                </div>
+              </div>
+              <aside class="setting-card">
+                <h4 class="font-black text-slate-950">Message Includes</h4>
+                <div class="grid gap-2 text-sm font-semibold text-slate-600">
+                  <div class="flex justify-between gap-3"><span>Status</span><span>running/sleeping/error</span></div>
+                  <div class="flex justify-between gap-3"><span>Progress</span><span>page, batch, exported</span></div>
+                  <div class="flex justify-between gap-3"><span>Schedule</span><span>next run countdown</span></div>
+                </div>
+              </aside>
+            </div>
+          </div>
+          <div class="border-t border-slate-200/80 p-4 sm:p-5">
+            <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
                 <h3 class="text-lg font-black text-slate-950">Endpoint Parameters</h3>
                 <p class="mt-1 text-sm font-medium text-slate-500">Change defaults used by dashboard buttons that call parameterized endpoints.</p>
               </div>
@@ -1555,7 +1601,7 @@
 
     function setBusy(busy) {
       state.busy = busy;
-      ["startBtn", "restartBtn", "startFirstPageBtn", "stopBtn", "refreshBtn", "loadDomainsBtn", "loadSeoBtn", "runSeoBtn", "loadLogsBtn", "loadBatchesBtn", "loadRecentWscBtn", "prevDomainsBtn", "nextDomainsBtn", "clearDomainFiltersBtn", "loadDuplicatesBtn", "clearDuplicatesBtn", "prevDuplicatesBtn", "nextDuplicatesBtn", "runWscBtn", "loadWscBtn", "prevWscBtn", "nextWscBtn", "clearWscFiltersBtn", "runNawalaBtn", "loadNawalaBtn", "prevNawalaBtn", "nextNawalaBtn", "loadDomainListsBtn", "clearDomainListsBtn", "prevDomainListsBtn", "nextDomainListsBtn", "refreshProgressBtn", "downloadDbBackupBtn", "downloadDbBackupCardBtn", "restoreDbBackupBtn", "saveSettingsScrapeIntervalBtn", "saveAndRestartScraperBtn", "saveEndpointParamsBtn"].forEach((id) => {
+      ["startBtn", "restartBtn", "startFirstPageBtn", "stopBtn", "refreshBtn", "loadDomainsBtn", "loadSeoBtn", "runSeoBtn", "loadLogsBtn", "loadBatchesBtn", "loadRecentWscBtn", "prevDomainsBtn", "nextDomainsBtn", "clearDomainFiltersBtn", "loadDuplicatesBtn", "clearDuplicatesBtn", "prevDuplicatesBtn", "nextDuplicatesBtn", "runWscBtn", "loadWscBtn", "prevWscBtn", "nextWscBtn", "clearWscFiltersBtn", "runNawalaBtn", "loadNawalaBtn", "prevNawalaBtn", "nextNawalaBtn", "loadDomainListsBtn", "clearDomainListsBtn", "prevDomainListsBtn", "nextDomainListsBtn", "refreshProgressBtn", "downloadDbBackupBtn", "downloadDbBackupCardBtn", "restoreDbBackupBtn", "saveTelegramSettingsBtn", "testTelegramBtn", "saveSettingsScrapeIntervalBtn", "saveAndRestartScraperBtn", "saveEndpointParamsBtn"].forEach((id) => {
         const node = $(id);
         if (node) node.disabled = busy;
       });
@@ -1739,6 +1785,18 @@
       $("settingsRestartLabel").classList.toggle("text-amber-800", Boolean(data.restart_required));
     }
 
+    function renderTelegramSettings(data) {
+      $("telegramEnabled").checked = Boolean(data.enabled);
+      $("telegramNotifyProgress").checked = Boolean(data.notify_progress);
+      $("telegramChatId").value = data.chat_id || "";
+      $("telegramBotToken").value = "";
+      $("telegramBotToken").placeholder = data.bot_token_set ? "Saved token is hidden" : "123456:ABC...";
+      $("telegramStatusLabel").textContent = data.enabled ? "Telegram: enabled" : "Telegram: off";
+      $("telegramStatusLabel").classList.toggle("bg-emerald-100", Boolean(data.enabled));
+      $("telegramStatusLabel").classList.toggle("text-emerald-800", Boolean(data.enabled));
+      $("telegramHint").textContent = data.bot_token_set ? `Token: ${data.bot_token_masked}` : "Token: not saved";
+    }
+
     function previewSettingsDuration() {
       const seconds = readSettingsDurationSeconds();
       $("settingsDurationDisplay").textContent = seconds ? formatDuration(seconds) : "-";
@@ -1755,7 +1813,33 @@
     async function loadScraperSettings() {
       const data = await api("/api/scraper/settings/");
       renderScraperSettings(data);
+      const telegram = await api("/api/telegram/settings/");
+      renderTelegramSettings(telegram);
       return data;
+    }
+
+    async function saveTelegramSettings() {
+      const botToken = $("telegramBotToken").value.trim();
+      const data = await api("/api/telegram/settings/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: $("telegramEnabled").checked,
+          notify_progress: $("telegramNotifyProgress").checked,
+          chat_id: $("telegramChatId").value.trim(),
+          bot_token: botToken,
+          keep_existing_token: !botToken,
+        }),
+      });
+      renderTelegramSettings(data);
+      toast(data.message || "Telegram settings saved.");
+      return data;
+    }
+
+    async function testTelegramNotification() {
+      await saveTelegramSettings();
+      const data = await api("/api/telegram/test/", { method: "POST" });
+      toast(data.message || "Telegram test sent.");
     }
 
     async function saveScrapeInterval() {
@@ -2250,6 +2334,8 @@
       const file = $("dbRestoreFile").files[0];
       $("dbRestoreStatus").textContent = file ? file.name : "No file selected";
     });
+    $("saveTelegramSettingsBtn").addEventListener("click", () => guarded(saveTelegramSettings));
+    $("testTelegramBtn").addEventListener("click", () => guarded(testTelegramNotification));
     $("saveSettingsScrapeIntervalBtn").addEventListener("click", () => guarded(saveSettingsScrapeInterval));
     $("saveAndRestartScraperBtn").addEventListener("click", () => guarded(saveAndRestartScraper));
     $("saveEndpointParamsBtn").addEventListener("click", saveEndpointParameterSettings);
